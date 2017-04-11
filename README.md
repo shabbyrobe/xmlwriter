@@ -8,26 +8,28 @@ on libxml2's xmlwriter module:
 
 Quick example:
 
-    func main() {
-        b := &bytes.Buffer{}
-        w := xmlwriter.Open(b)
-        ec := &xmlwriter.ErrCollector{}
-        defer ec.Panic()
+```go
+func main() {
+    b := &bytes.Buffer{}
+    w := xmlwriter.Open(b)
+    ec := &xmlwriter.ErrCollector{}
+    defer ec.Panic()
 
-        ec.Do(
-            w.StartDoc(xmlwriter.Doc{})
-            w.StartElem(xmlwriter.Elem{Name: "foo"})
-            w.WriteAttr(xmlwriter.Attr{Name: "a1", Value: "val1"})
-            w.WriteAttr(xmlwriter.Attr{Name: "a2", Value: "val2"})
-            w.WriteComment(xmlwriter.Comment{"hello"})
-            w.StartElem(xmlwriter.Elem{Name: "bar"})
-            w.WriteAttr(xmlwriter.Attr{Name: "a1", Value: "val1"})
-            w.WriteAttr(xmlwriter.Attr{Name: "a2", Value: "val2"})
-            w.StartElem(xmlwriter.Elem{Name: "baz"})
-            w.EndAllFlush()
-        )
-        fmt.Println(b.String())
-    }
+    ec.Do(
+        w.StartDoc(xmlwriter.Doc{})
+        w.StartElem(xmlwriter.Elem{Name: "foo"})
+        w.WriteAttr(xmlwriter.Attr{Name: "a1", Value: "val1"})
+        w.WriteAttr(xmlwriter.Attr{Name: "a2", Value: "val2"})
+        w.WriteComment(xmlwriter.Comment{"hello"})
+        w.StartElem(xmlwriter.Elem{Name: "bar"})
+        w.WriteAttr(xmlwriter.Attr{Name: "a1", Value: "val1"})
+        w.WriteAttr(xmlwriter.Attr{Name: "a2", Value: "val2"})
+        w.StartElem(xmlwriter.Elem{Name: "baz"})
+        w.EndAllFlush()
+    )
+    fmt.Println(b.String())
+}
+```
 
 xmlwriter is about twice as quick as using the stdlib's `encoding/xml` and
 offers total control of the output. If you don't require that level of control,
