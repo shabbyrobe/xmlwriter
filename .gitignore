@@ -1,0 +1,6 @@
+junk/junk
+tester/gotester/gotester
+tester/tester
+*.dSYM
+*.test
+*.prof

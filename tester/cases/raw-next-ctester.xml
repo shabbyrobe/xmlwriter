@@ -1,0 +1,6 @@
+<?xml version="1.0"?>
+<script name="cdata" indent="true">
+    <command action="start" kind="elem" name="pants"/>
+    <command action="write" kind="raw">hello</command>
+    <command action="end" kind="elem" />
+</script>
