@@ -69,7 +69,9 @@ func (e *ErrCollector) Panic() {
 }
 
 func (e *ErrCollector) Set(err *error) {
-	*err = e
+	if e.Err != nil {
+		*err = e
+	}
 }
 
 func (e *ErrCollector) Do(errs ...error) {

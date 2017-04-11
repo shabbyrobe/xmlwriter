@@ -20,6 +20,16 @@ func TestCollectorSet(t *testing.T) {
 	tt.Pattern(t, `error at .*errs_test\.go.* #1 - yep`, ec.Error())
 }
 
+func TestCollectorSetOK(t *testing.T) {
+	ec := &ErrCollector{}
+	result := func() (err error) {
+		defer ec.Set(&err)
+		ec.Do(nil)
+		return
+	}()
+	tt.Equals(t, nil, result)
+}
+
 func TestCollectorSetMultiple(t *testing.T) {
 	in := fmt.Errorf("yep")
 	ec := &ErrCollector{}
