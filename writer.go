@@ -87,9 +87,10 @@ func Open(w io.Writer, options ...Option) *Writer {
 	return xw
 }
 
-func OpenEncoding(w io.Writer, encoding string, encoder *encoding.Encoder, options ...Option) *Writer {
-	xw := newWriter(encoder.Writer(w), options...)
-	xw.encoding = encoding
+func OpenEncoding(w io.Writer, encstr string, encoder *encoding.Encoder, options ...Option) *Writer {
+	enc := encoding.HTMLEscapeUnsupported(encoder).Writer(w)
+	xw := newWriter(enc, options...)
+	xw.encoding = encstr
 	return xw
 }
 
