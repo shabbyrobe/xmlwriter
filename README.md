@@ -46,3 +46,11 @@ it's probably better to stick with `encoding/xml`
 xmlwriter is exhaustively tested using a fairly insane mess of C scripts you
 can find in the `tester/` directory.
 
+
+License
+-------
+
+xmlwriter uses the Apache License 2.0. I pulled in about 60 lines of code from
+the `xml/encoding` package in the Go sources and retained the copyright. Not sure 
+the exact implications, IANAL. Please file an issue if I've done something wrong.
+
