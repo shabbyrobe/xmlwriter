@@ -12,16 +12,16 @@ until after a series of procedural calls.
 ErrCollector it is intended to help cut down on boilerplate like this:
 
 	if err := w.Start(xmlwriter.Doc{}); err != nil {
-		return nil
+		return err
 	}
 	if err := w.Start(xmlwriter.Elem{Name: "elem"}); err != nil {
-		return nil
+		return err
 	}
 	if err := w.Start(xmlwriter.Attr{Name: "attr", Value: "yep"}); err != nil {
-		return nil
+		return err
 	}
 	if err := w.Start(xmlwriter.Attr{Name: "attr2", Value: "nup"}); err != nil {
-		return nil
+		return err
 	}
 
 For any sufficiently complex procedural XML assembly, this is patently
