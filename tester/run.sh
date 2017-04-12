@@ -97,6 +97,11 @@ skip=0
 fail=0
 
 while read line; do
+    if [[ ! -f "$line" ]]; then
+        skip "file does not exist"
+        continue
+    fi
+
     mime="$( file -b --mime "$line" )"
 
     i="$((i+1))"
