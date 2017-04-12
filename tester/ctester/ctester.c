@@ -1258,6 +1258,10 @@ int script_parse(xmlDocPtr doc, struct script *script) {
     int rc = 0;
 
     xmlNode *root = xmlDocGetRootElement(doc);
+    if (root == NULL) {
+        rc = 1;
+        goto cleanup;
+    }
 
     /* print_element_names(root_element); */
     if (xmlStrcmp(root->name, (xmlChar *)"script") != 0) {
