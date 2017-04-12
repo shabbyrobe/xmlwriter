@@ -4,7 +4,10 @@ xmlwriter
 =========
 
 xmlwriter is a Go library providing a procedural XML generation API based
-on libxml2's xmlwriter module:
+on libxml2's xmlwriter module.
+
+The package is extensively documented on
+[GoDoc](https://godoc.org/github.com/shabbyrobe/xmlwriter).
 
 Quick example:
 
