@@ -205,5 +205,26 @@ xmlwriter.Attr{} values can be assigned from any golang primitive like so:
 	Attr{Name: "foo"}.Uint64(5)
 	Attr{Name: "foo"}.Float64(1.234)
 
+
+Encodings
+
+xmlwriter supports encoders from the golang.org/x/text/encoding package.
+UTF-8 strings written in from golang will be converted on the fly and the
+document declaration will be written correctly.
+
+To write your XML using the windows-1252 encoder:
+
+	b := &bytes.Buffer{}
+	enc := charmap.Windows1252.NewEncoder()
+	w := xw.OpenEncoding(b, "windows-1252", enc)
+	xw.Must(w.Start(xw.Doc{}))
+	xw.Must(w.Start(xw.Elem{Name: "hello"}))
+	xw.Must(w.Write(xw.Text("Résumé")))
+	w.EndAllFlush()
+	os.Stdout.Write(b.Bytes())
+
+The document line will look like this:
+
+	<?xml version="1.0" encoding="windows-1252"?>
 */
 package xmlwriter
