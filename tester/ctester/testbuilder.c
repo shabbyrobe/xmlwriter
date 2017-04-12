@@ -3,6 +3,7 @@
 #include <string.h>
 #include <stdbool.h>
 #include <assert.h>
+#include <stdarg.h>
 
 #include <expat.h>
 #include <libxml/xmlwriter.h>
@@ -10,8 +11,34 @@
 typedef XML_Char expat_ch;
 typedef xmlChar lxml_ch;
 
-char *error = NULL;
-bool debug = false;
+enum tb_err {
+    TB_OK = 0,
+    TB_ERR = 1,
+    TB_ERR_UNHANDLED = 10,
+    TB_ERR_PARSE_FAIL = 11,
+    TB_ERR_PARSE_STOPPED = 12,
+    TB_ERR_ARGS = 64, // I think this is EXIT_USAGE
+};
+
+void usage() {
+    char *usage_str = 
+        "Accepts xml from stdin and emits an xml tester script to stdout\n"
+        "\n"
+        "Usage: testbuilder [-sd]\n"
+        "\n"
+        "Options:\n"
+        "  -d  Debug mode. Outputs the function and line that caused the\n"
+        "      command to be written into the resulting test.\n"
+        "  -s  Strip unnecessary whitespace. Experimental.\n"
+        "\n"
+        "Notes:\n"
+        "  - If the parser encouters an error, there will still be invalid\n"
+        "    xml flushed to stdout. For any exit status other than 0, assume\n"
+        "    stdout can't be used\n"
+    ;
+
+    fprintf(stderr, "%s", usage_str);
+}
 
 #ifndef HAVE_STRNDUP
 char *strndup(const char *s, size_t n)
@@ -28,11 +55,21 @@ char *strndup(const char *s, size_t n)
 struct xml_ctx {
     xmlTextWriterPtr writer;
     XML_Parser parser;
+    bool debug;
+    bool strip_ws;
+
+    char *error;
+    int error_code;
+    void (*error_free)(void *p);
+
+    // internal buffer {{{
+    bool collect;
     char *content;
     size_t len;
     size_t sz;
+    // }}}
+
     bool doc;
-    bool collect;
     bool in_dtd;
     bool in_attlist;
 
@@ -40,11 +77,36 @@ struct xml_ctx {
     const expat_ch **as; size_t aslen; size_t assz;
 };
 
+int xml_ctx_errf(struct xml_ctx *ctx, int code, char *fmt, ...) {
+    if (ctx->error != NULL && ctx->error_free != NULL) {
+        ctx->error_free(ctx->error);
+    }
+    va_list args;
+    va_start(args, fmt);
+    ctx->error_code = code;
+    ctx->error_free = free;
+    vasprintf(&ctx->error, fmt, args);
+    va_end(args);
+    return code;
+}
+
+int xml_ctx_err(struct xml_ctx *ctx, int code, char *error) {
+    if (ctx->error != NULL && ctx->error_free != NULL) {
+        ctx->error_free(ctx->error);
+    }
+    ctx->error_code = code;
+    ctx->error = error;
+    return code;
+}
+
 void xml_ctx_deinit(struct xml_ctx *ctx) {
+    if (ctx->error != NULL && ctx->error_free != NULL) {
+        ctx->error_free(ctx->error);
+    }
     free(ctx->content);
     ctx->sz = 0;
-    if (ctx->ns) { free(ctx->ns); }
-    if (ctx->as) { free(ctx->as); }
+    free(ctx->ns);
+    free(ctx->as);
 }
 
 void xml_ctx_clear(struct xml_ctx *ctx) {
@@ -79,7 +141,7 @@ void command_start(struct xml_ctx *ctx, char *action, char *kind, const char *fn
     xmlTextWriterWriteAttribute(ctx->writer, (lxml_ch*)"action", (lxml_ch*)action);
     xmlTextWriterWriteAttribute(ctx->writer, (lxml_ch*)"kind", (lxml_ch*)kind);
 
-    if (debug) {
+    if (ctx->debug) {
         char buf[64];
         XML_Size ln = XML_GetCurrentLineNumber(ctx->parser);
         snprintf(buf, 64, "%lu", ln);
@@ -346,6 +408,20 @@ void xml_default(void *user_data, const expat_ch *s, int len) {
     }
 
     if (s != NULL) {
+        // this is not well tested - consider it experimental.
+        if (ctx->strip_ws) {
+            bool is_ws = true;
+            for (int i = 0; i < len; i++) {
+                if (!isspace(s[i])) {
+                    is_ws = false;
+                    break;
+                }
+            }
+            if (is_ws) {
+                return;
+            }
+        }
+
         command_start(ctx, "write", "raw", __FUNCTION__);
 
         // next must always be true if we want this to work with
@@ -446,7 +522,7 @@ void xml_entity_decl (
 
     if (base != NULL && strlen(base) > 0) {
         // FIXME: find out what this actually means, the docs don't say.
-        fprintf(stderr, "dtd-entity base found\n");
+        xml_ctx_err(ctx, TB_ERR_UNHANDLED, "dtd-entity base found");
         XML_StopParser(ctx->parser, false);
         return;
     }
@@ -457,7 +533,8 @@ void xml_entity_decl (
     // I suspect this will need to expand considerably as symbolic numeric
     // values are far likelier to appear in entities. This could be an
     // ongoing pain point for the tester - the following are semantically
-    // identical: <!ENTITY excl "&#33;"> == <!ENTITY excl "!">
+    // identical and either are valid if they appear in the source: 
+    //   <!ENTITY excl "&#33;"> == <!ENTITY excl "!">
     if (value_length == 2 && strcmp(value, "\xC2\xA0") == 0) {
         xmlTextWriterWriteString(ctx->writer, (lxml_ch*)"&#160;");
         value_length = 6;
@@ -492,7 +569,7 @@ void xml_element_decl_child(struct xml_ctx *ctx, XML_Content *model) {
     case XML_CTYPE_CHOICE : sep = "|"; break;
     case XML_CTYPE_SEQ    : sep = ","; break;
     default:
-        fprintf(stderr, "type: %d\n", model->type);
+        xml_ctx_errf(ctx, TB_ERR_UNHANDLED, "unexpected entity model type %d", model->type);
         XML_StopParser(ctx->parser, false);
         return;
     }
@@ -513,16 +590,20 @@ void xml_element_decl_child(struct xml_ctx *ctx, XML_Content *model) {
             xml_element_decl_child(ctx, child);
         break;
         default:
-            fprintf(stderr, "element decl bad child\n");
+            // no dessert for you!
+            xml_ctx_err(ctx, TB_ERR_UNHANDLED, "element decl bad child");
             XML_StopParser(ctx->parser, false);
             return;
         }
-        /* xml_ctx_append(ctx, child->name); */
         switch (child->quant) {
         case XML_CQUANT_NONE : break;
         case XML_CQUANT_OPT  : xml_ctx_append(ctx, "?"); break;
         case XML_CQUANT_REP  : xml_ctx_append(ctx, "*"); break;
         case XML_CQUANT_PLUS : xml_ctx_append(ctx, "+"); break;
+        default:
+            xml_ctx_err(ctx, TB_ERR_UNHANDLED, "element decl bad quant");
+            XML_StopParser(ctx->parser, false);
+            return;
         }
     }
     xml_ctx_append(ctx, ")");
@@ -562,7 +643,7 @@ void xml_element_decl(void *user_data, const expat_ch *name, XML_Content *model)
     break;
 
     default:
-        fprintf(stderr, "element decl bad child\n");
+        xml_ctx_err(ctx, TB_ERR_UNHANDLED, "element decl bad child");
         XML_StopParser(ctx->parser, false);
         return;
     }
@@ -616,7 +697,7 @@ void xml_notation(
 
     if (base != NULL && strlen(base) > 0) {
         // FIXME: find out what this actually means, the docs don't say.
-        fprintf(stderr, "notation base found\n");
+        xml_ctx_err(ctx, TB_ERR_UNHANDLED, "notation base found");
         XML_StopParser(ctx->parser, false);
         return;
     }
@@ -667,22 +748,27 @@ size_t stdin_read(char **buffer) {
 }
 
 int main(int argc, char *argv[]) {
-    if (argc >= 2) {
-        if (strcmp(argv[1], "-d") == 0) {
-            debug = true;
-        }
-    }
     int rc = 0;
 
     xmlTextWriterPtr writer = xmlNewTextWriterFilename("/dev/stdout", 0);
     xmlTextWriterSetIndent(writer, 1);
 
     XML_Parser parser = XML_ParserCreate("UTF-8");
-    /* XML_SetReturnNSTriplet(parser, 1); */
     struct xml_ctx ctx = {
         .writer = writer,
         .parser = parser,
     };
+
+    int ch;
+    while ((ch = getopt(argc, argv, "sdh")) != -1) {
+        switch (ch) {
+        case 'd': ctx.debug = true; break;
+        case 's': ctx.strip_ws = true; break;
+        case 'h': usage(); goto cleanup; break;
+        case '?': usage(); rc = TB_ERR_ARGS; goto cleanup; break;
+        }
+    }
+
     XML_SetUserData(parser, &ctx);
 
     XML_SetElementHandler(parser, xml_elem_start, xml_elem_end);
@@ -735,16 +821,18 @@ int main(int argc, char *argv[]) {
 
             XML_Index idx = XML_GetCurrentByteIndex(parser);
             if (idx < 0 || status != XML_STATUS_OK) {
-                fprintf(stderr, "Error parsing stopped before completion %ld != %zu, byte %zu\n", idx, len, read);
-                rc = 1; goto cleanup;
+                xml_ctx_errf(&ctx, TB_ERR_PARSE_FAIL, "parsing failed before completion %ld != %zu, byte %zu\n", idx, len, read);
+                goto cleanup;
             }
 
             size_t idx_sz = (size_t) idx;
             if (done) {
                 /* XML_ParsingStatus ps = {}; */
                 if (idx_sz != read) {
-                    fprintf(stderr, "Parsing stopped before completion %zu != %zu, byte %zu\n", idx_sz, len, read);
-                    rc = 1; goto cleanup;
+                    xml_ctx_errf(&ctx, TB_ERR_PARSE_STOPPED, 
+                        "parsing stopped before completion %zu != %zu, byte %zu\n", 
+                        idx_sz, len, read);
+                    goto cleanup;
                 }
             }
         }
@@ -759,11 +847,17 @@ int main(int argc, char *argv[]) {
     xmlTextWriterEndDocument(writer);
     xmlTextWriterFlush(writer);
 
-    goto cleanup;
-
 cleanup:
+    if (ctx.error_code > 0) {
+        rc = ctx.error_code;
+        if (ctx.error != NULL) {
+            fprintf(stderr, "%s\n", ctx.error);
+        } else {
+            fprintf(stderr, "parsing failed with unknown error %d\n", ctx.error_code);
+        }
+    }
+
     XML_ParserFree(parser);
-    /* free(input); */
     xml_ctx_deinit(&ctx);
     xmlFreeTextWriter(writer);
     xmlCleanupParser();
