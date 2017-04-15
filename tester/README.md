@@ -1,12 +1,12 @@
 Go xmlwriter Tester
 ===================
 
-This tester is made up of a few key pieces - `gotester`, `testbuilder` and `ctester`,
-and an XML-based testing DSL
+This tester is made up of a few key pieces - `gotester`, `testbuilder` and
+`ctester`, and an XML-based testing DSL
 
 Note: this will eventually be moved into a separate repository when it
 stabilises so that users of tools like `dep` or `govendor` aren't forced to
-vendor the `charmap` extension.
+vendor the `charmap` extension when including `xmlwriter`.
 
 
 Test spec

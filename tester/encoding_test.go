@@ -1,5 +1,9 @@
 package tester
 
+// These tests are in the tester package rather than the xmlwriter
+// package to try to avoid issues with tools like dep vendoring more
+// stuff than it should (https://github.com/golang/dep/issues/120).
+
 import (
 	"bytes"
 	"fmt"
