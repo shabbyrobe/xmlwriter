@@ -186,13 +186,6 @@ func (p printer) writeEntityValue(value string, enforce bool) error {
 		if dq >= 0 && sq >= 0 {
 			return fmt.Errorf("xmlwriter: entity value must only contain double or single quotes, not both")
 		}
-
-		// PEReference | Reference
-		if len(value) > 0 && (value[0] == '%' || value[0] == '&') {
-			if strings.IndexAny(value[1:], "%&"+string(qc)) >= 0 {
-				return fmt.Errorf("xmlwriter: entity value may not contain %%, &, or quote char")
-			}
-		}
 	}
 
 	p.WriteByte(qc)

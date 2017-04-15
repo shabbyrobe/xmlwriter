@@ -643,6 +643,8 @@ func TestDTDEntity(t *testing.T) {
 	tt.Equals(t, `<!ENTITY hi "it's">`, doWrite(DTDEntity{Name: "hi", Content: "it's"}))
 	tt.Equals(t, `<!ENTITY hi 'it"s'>`, doWrite(DTDEntity{Name: "hi", Content: `it"s`}))
 
+	tt.Equals(t, `<!ENTITY hi "&#20;&#20;">`, doWrite(DTDEntity{Name: "hi", Content: "&#20;&#20;"}))
+
 	tt.Equals(t, `<!ENTITY % hi "yep">`,
 		doWrite(DTDEntity{Name: "hi", Content: `yep`, IsPE: true}))
 
