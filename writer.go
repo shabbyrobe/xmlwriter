@@ -39,6 +39,7 @@ type Writer struct {
 
 	NewlineString string
 
+	// Controls the indenting process used by the writer.
 	Indenter Indenter
 }
 
@@ -98,53 +99,11 @@ func (w *Writer) Depth() int {
 	return w.current
 }
 
-func (w *Writer) pushBegin(kind NodeKind, parents []NodeKind) error {
-	if w.Enforce {
-		if err := w.checkParent(parents...); err != nil {
-			return err
-		}
-	}
-	if len(w.nodes) <= w.current+1 {
-		w.nodes = append(w.nodes, node{})
-	}
-	if err := w.Next(); err != nil {
-		return err
-	}
-	return nil
-}
-
-func (w *Writer) pushEnd() error {
-	w.current++
-	if err := w.nodes[w.current].open(w); err != nil {
-		return err
-	}
-	return nil
-}
-
-func (w *Writer) checkParent(kind ...NodeKind) error {
-	k := NoNode
-	if w.current >= 0 {
-		k = w.nodes[w.current].kind
-	}
-	valid := false
-	for _, check := range kind {
-		if check == k {
-			valid = true
-			break
-		}
-	}
-	if !valid {
-		// this used to be an error value, but it caused the ...NodeKind
-		// arg to escape to the heap.
-		names := make([]string, len(kind))
-		for i, k := range kind {
-			names[i] = kindName[k]
-		}
-		return fmt.Errorf("xmlwriter: unexpected kind %s, expected %s", kindName[k], strings.Join(names, ", "))
-	}
-	return nil
-}
-
+// Next ensures that the current element is opened and the next one
+// can be started. It is called for all node types except Raw{}. This
+// is so that you can write raw strings inside elements that are open
+// but not opened. See StateOpen and StateOpened for more details on
+// this distinction.
 func (w *Writer) Next() error {
 	if w.current >= 0 {
 		w.nodes[w.current].children++
@@ -154,51 +113,6 @@ func (w *Writer) Next() error {
 			}
 		}
 	}
-	return nil
-}
-
-func (w *Writer) writeBeginNext(kind NodeKind) error {
-	w.Next()
-	return w.writeBeginCur(kind)
-}
-
-func (w *Writer) writeBeginCur(kind NodeKind) error {
-	if w.Indenter != nil {
-		if err := w.writeIndent(Event{StateOpen, kind, 0}); err != nil {
-			return err
-		}
-		w.last = Event{StateEnded, kind, 0}
-	}
-	return nil
-}
-
-func (w *Writer) pop(kind ...NodeKind) error {
-	if w.current < 0 {
-		return fmt.Errorf("xmlwriter: could not pop node")
-	}
-	valid := true
-	if len(kind) > 0 {
-		currentKind := w.nodes[w.current].kind
-		for _, k := range kind {
-			if currentKind != k {
-				valid = false
-				break
-			}
-		}
-		if !valid {
-			// this used to be an error value, but it caused the ...NodeKind
-			// arg to escape to the heap.
-			names := make([]string, len(kind))
-			for i, k := range kind {
-				names[i] = kindName[k]
-			}
-			return fmt.Errorf("xmlwriter: unexpected kind %s, expected %s", kindName[currentKind], strings.Join(names, ", "))
-		}
-	}
-	if err := w.nodes[w.current].end(w); err != nil {
-		return err
-	}
-	w.current--
 	return nil
 }
 
@@ -238,67 +152,39 @@ func (w *Writer) Start(nodes ...Startable) error {
 	return nil
 }
 
+// Flush ensures the output buffer accumuated inside the Writer
+// is fully written to the underlying io.Writer.
 func (w *Writer) Flush() error {
 	return w.printer.Flush()
 }
 
 // start methods for startables
 
-func (w *Writer) StartDoc(doc Doc) error {
-	return doc.start(w)
-}
-
-func (w *Writer) StartComment(comment Comment) error {
-	return comment.start(w)
-}
-
-func (w *Writer) StartCData(cdata CData) error {
-	return cdata.start(w)
-}
-
-func (w *Writer) StartDTD(dtd DTD) error {
-	return dtd.start(w)
-}
-
-func (w *Writer) StartDTDAttList(al DTDAttList) error {
-	return al.start(w)
-}
-
-func (w *Writer) StartElem(elem Elem) error {
-	return elem.start(w)
-}
+func (w *Writer) StartDoc(doc Doc) error              { return doc.start(w) }
+func (w *Writer) StartComment(comment Comment) error  { return comment.start(w) }
+func (w *Writer) StartCData(cdata CData) error        { return cdata.start(w) }
+func (w *Writer) StartDTD(dtd DTD) error              { return dtd.start(w) }
+func (w *Writer) StartDTDAttList(al DTDAttList) error { return al.start(w) }
+func (w *Writer) StartElem(elem Elem) error           { return elem.start(w) }
 
 // write methods for startables
 
-func (w *Writer) WriteCData(cdata CData) (err error) {
-	return cdata.write(w)
-}
-
-func (w *Writer) WriteElem(elem Elem) (err error) {
-	return elem.write(w)
-}
-
-func (w *Writer) WriteText(text string) (err error) {
-	return Text(text).write(w)
-}
-
-func (w *Writer) WriteComment(comment Comment) (err error) {
-	return comment.write(w)
-}
+func (w *Writer) WriteCData(cdata CData) (err error)       { return cdata.write(w) }
+func (w *Writer) WriteComment(comment Comment) (err error) { return comment.write(w) }
+func (w *Writer) WriteElem(elem Elem) (err error)          { return elem.write(w) }
+func (w *Writer) WriteText(text string) (err error)        { return Text(text).write(w) }
 
 // write methods for non-startable writables
 
-func (w *Writer) WriteCDataContent(cdata string) error {
-	return CDataContent(cdata).write(w)
-}
-
-func (w *Writer) WriteCommentContent(comment string) error {
-	return CommentContent(comment).write(w)
-}
-
-func (w *Writer) WriteRaw(raw string) error {
-	return Raw(raw).write(w)
-}
+func (w *Writer) WriteCDataContent(cdata string) error           { return CDataContent(cdata).write(w) }
+func (w *Writer) WriteCommentContent(comment string) error       { return CommentContent(comment).write(w) }
+func (w *Writer) WriteDTDEntity(entity DTDEntity) error          { return entity.write(w) }
+func (w *Writer) WriteDTDElem(el DTDElem) error                  { return el.write(w) }
+func (w *Writer) WriteDTDAttr(attr DTDAttr) (err error)          { return attr.write(w) }
+func (w *Writer) WriteDTDAttList(attlist DTDAttList) (err error) { return attlist.write(w) }
+func (w *Writer) WriteNotation(n Notation) (err error)           { return n.write(w) }
+func (w *Writer) WritePI(pi PI) error                            { return pi.write(w) }
+func (w *Writer) WriteRaw(raw string) error                      { return Raw(raw).write(w) }
 
 func (w *Writer) WriteAttr(attrs ...Attr) (err error) {
 	for _, a := range attrs {
@@ -309,39 +195,7 @@ func (w *Writer) WriteAttr(attrs ...Attr) (err error) {
 	return nil
 }
 
-func (w *Writer) WritePI(pi PI) error {
-	return pi.write(w)
-}
-
-func (w *Writer) WriteDTDEntity(entity DTDEntity) error {
-	return entity.write(w)
-}
-
-func (w *Writer) WriteDTDElem(el DTDElem) error {
-	return el.write(w)
-}
-
-func (w *Writer) WriteNotation(n Notation) (err error) {
-	return n.write(w)
-}
-
-func (w *Writer) WriteDTDAttr(attr DTDAttr) (err error) {
-	return attr.write(w)
-}
-
-func (w *Writer) WriteDTDAttList(attlist DTDAttList) (err error) {
-	return attlist.write(w)
-}
-
 // end methods
-
-func (w *Writer) EndCData() (err error) {
-	return w.End(CDataNode)
-}
-
-func (w *Writer) EndComment() (err error) {
-	return w.End(CommentNode)
-}
 
 // EndDoc ends the current xmlwriter.Doc{} and any node in between. This is not
 // the same as calling End(DocNode), which will only end a Doc{} if it is the
@@ -358,22 +212,16 @@ func (w *Writer) EndDoc() (err error) {
 	return w.End(DocNode)
 }
 
-func (w *Writer) EndDTD() (err error) {
-	return w.End(DTDNode)
-}
-
-func (w *Writer) EndDTDAttList() (err error) {
-	return w.End(DTDAttListNode)
-}
+func (w *Writer) EndCData() (err error)        { return w.End(CDataNode) }
+func (w *Writer) EndComment() (err error)      { return w.End(CommentNode) }
+func (w *Writer) EndDTD() (err error)          { return w.End(DTDNode) }
+func (w *Writer) EndDTDAttList() (err error)   { return w.End(DTDAttListNode) }
+func (w *Writer) EndElem(name ...string) error { return w.End(ElemNode, name...) }
 
 func (w *Writer) EndElemFull(name ...string) error {
 	if w.current >= 0 {
 		w.nodes[w.current].elem.Full = true
 	}
-	return w.End(ElemNode, name...)
-}
-
-func (w *Writer) EndElem(name ...string) error {
 	return w.End(ElemNode, name...)
 }
 
@@ -477,6 +325,102 @@ func (w *Writer) EndAllFlush() error {
 	return w.Flush()
 }
 
+// {{{ Internal functions
+
 func (w *Writer) writeIndent(next Event) error {
 	return w.Indenter.Indent(w, w.last, next)
 }
+
+func (w *Writer) pushBegin(kind NodeKind, parents []NodeKind) error {
+	if w.Enforce {
+		if err := w.checkParent(parents...); err != nil {
+			return err
+		}
+	}
+	if len(w.nodes) <= w.current+1 {
+		w.nodes = append(w.nodes, node{})
+	}
+	if err := w.Next(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (w *Writer) pushEnd() error {
+	w.current++
+	if err := w.nodes[w.current].open(w); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (w *Writer) checkParent(kind ...NodeKind) error {
+	k := NoNode
+	if w.current >= 0 {
+		k = w.nodes[w.current].kind
+	}
+	valid := false
+	for _, check := range kind {
+		if check == k {
+			valid = true
+			break
+		}
+	}
+	if !valid {
+		// this used to be an error value, but it caused the ...NodeKind
+		// arg to escape to the heap.
+		names := make([]string, len(kind))
+		for i, k := range kind {
+			names[i] = kindName[k]
+		}
+		return fmt.Errorf("xmlwriter: unexpected kind %s, expected %s", kindName[k], strings.Join(names, ", "))
+	}
+	return nil
+}
+
+func (w *Writer) writeBeginNext(kind NodeKind) error {
+	w.Next()
+	return w.writeBeginCur(kind)
+}
+
+func (w *Writer) writeBeginCur(kind NodeKind) error {
+	if w.Indenter != nil {
+		if err := w.writeIndent(Event{StateOpen, kind, 0}); err != nil {
+			return err
+		}
+		w.last = Event{StateEnded, kind, 0}
+	}
+	return nil
+}
+
+func (w *Writer) pop(kind ...NodeKind) error {
+	if w.current < 0 {
+		return fmt.Errorf("xmlwriter: could not pop node")
+	}
+	valid := true
+	if len(kind) > 0 {
+		currentKind := w.nodes[w.current].kind
+		for _, k := range kind {
+			if currentKind != k {
+				valid = false
+				break
+			}
+		}
+		if !valid {
+			// this used to be an error value, but it caused the ...NodeKind
+			// arg to escape to the heap.
+			names := make([]string, len(kind))
+			for i, k := range kind {
+				names[i] = kindName[k]
+			}
+			return fmt.Errorf("xmlwriter: unexpected kind %s, expected %s", kindName[currentKind], strings.Join(names, ", "))
+		}
+	}
+	if err := w.nodes[w.current].end(w); err != nil {
+		return err
+	}
+	w.current--
+	return nil
+}
+
+// }}}
