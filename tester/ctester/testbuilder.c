@@ -1,12 +1,17 @@
 #include <unistd.h>
+#include <getopt.h>
 #include <stdio.h>
 #include <string.h>
 #include <stdbool.h>
 #include <assert.h>
 #include <stdarg.h>
+#include <ctype.h>
 
 #include <expat.h>
 #include <libxml/xmlwriter.h>
+
+#include "string.c"
+#include "xml.c"
 
 typedef XML_Char expat_ch;
 typedef xmlChar lxml_ch;
@@ -39,18 +44,6 @@ void usage() {
 
     fprintf(stderr, "%s", usage_str);
 }
-
-#ifndef HAVE_STRNDUP
-char *strndup(const char *s, size_t n)
-{
-    char* new = malloc(n+1);
-    if (new) {
-        strncpy(new, s, n);
-        new[n] = '\0';
-    }
-    return new;
-}
-#endif
 
 struct xml_ctx {
     xmlTextWriterPtr writer;
@@ -535,6 +528,11 @@ void xml_entity_decl (
     // ongoing pain point for the tester - the following are semantically
     // identical and either are valid if they appear in the source: 
     //   <!ENTITY excl "&#33;"> == <!ENTITY excl "!">
+    //
+    // TODO: this is the job of a normaliser. scan all the xml files on
+    // my hard drive looking for entities, then look at what the convention
+    // is for encoding them. I suspect even in UTF-8 documents the convention
+    // is to convert >127 chars to entities. Normaliser can have that as a rule.
     if (value_length == 2 && strcmp(value, "\xC2\xA0") == 0) {
         xmlTextWriterWriteString(ctx->writer, (lxml_ch*)"&#160;");
         value_length = 6;
@@ -753,7 +751,7 @@ int main(int argc, char *argv[]) {
     xmlTextWriterPtr writer = xmlNewTextWriterFilename("/dev/stdout", 0);
     xmlTextWriterSetIndent(writer, 1);
 
-    XML_Parser parser = XML_ParserCreate("UTF-8");
+    XML_Parser parser = XML_ParserCreate(NULL);
     struct xml_ctx ctx = {
         .writer = writer,
         .parser = parser,
@@ -821,17 +819,21 @@ int main(int argc, char *argv[]) {
 
             XML_Index idx = XML_GetCurrentByteIndex(parser);
             if (idx < 0 || status != XML_STATUS_OK) {
-                xml_ctx_errf(&ctx, TB_ERR_PARSE_FAIL, "parsing failed before completion %ld != %zu, byte %zu\n", idx, len, read);
+                enum XML_Error err = XML_GetErrorCode(parser);
+
+                xml_ctx_errf(&ctx, TB_ERR_PARSE_FAIL, 
+                    "expat error %s(%d) before completion %ld != %zu, byte %zu\n", 
+                    expat_errors[err], err, idx, len, read);
                 goto cleanup;
             }
 
             size_t idx_sz = (size_t) idx;
             if (done) {
-                /* XML_ParsingStatus ps = {}; */
                 if (idx_sz != read) {
-                    xml_ctx_errf(&ctx, TB_ERR_PARSE_STOPPED, 
-                        "parsing stopped before completion %zu != %zu, byte %zu\n", 
-                        idx_sz, len, read);
+                    enum XML_Error err = XML_GetErrorCode(parser);
+                    xml_ctx_errf(&ctx, TB_ERR_PARSE_STOPPED,
+                        "expat stopped %s(%d) before completion %ld != %zu, byte %zu\n", 
+                        expat_errors[err], err, idx, len, read);
                     goto cleanup;
                 }
             }

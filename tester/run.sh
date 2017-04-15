@@ -16,20 +16,29 @@ usage="Usage: run.sh ( -l <filelist> | -f <file> )"
 
 filelist=""
 file=""
+query=""
+db=""
 required=( xmllint make )
 for r in "${required[@]}"; do
     hash "$r" 2>/dev/null || { echo >&2 "Required program $r missing"; exit 1; }
 done
 
-while getopts ":f:l:" opt; do
+while getopts ":f:l:d:q:" opt; do
     case "$opt" in
         l) filelist="$OPTARG";;
         f) file="$OPTARG";;
+        d) db="$OPTARG";;
+        q) query="$OPTARG";;
         *) echo >&2 "Invalid usage"; echo "$usage"; exit 1;
     esac
 done
 
-if [[ -z "$filelist" && -z "$file" ]]; then
+if [[ ! -z "$query" && -z "$db" ]]; then
+    echo >&2 "Cannot use -q without -d"
+    exit 1
+fi
+
+if [[ -z "$filelist" && -z "$file" && -z "$db" ]]; then
     echo >&2 "File list missing"
     exit 1
 fi
@@ -76,7 +85,7 @@ xmlclean() {
     # this is crazy. a structural xml differ might be better, but this actually
     # works, believe it or not. the xml differs i tried were slow and didn't work
     # at all.
-    attrsorter | encfixer | xmllint --format -
+    normaliser | encfixer | xmllint --format -
 }
 
 skip() {
@@ -115,6 +124,7 @@ while read line; do
         case "$enc" in
             UTF-8) ;;
             ISO-8859-1) ;;
+            # WINDOWS-1252) ;; # this is not actually supported by expat properly
             *) skip "mime $enc not supported"; continue;;
         esac
     else
@@ -190,6 +200,9 @@ while read line; do
     fi
 
 done < <(
+    if [[ ! -z "$db" ]]; then
+        indexer query "$db" "$query"
+    fi
     if [[ ! -z "$file" ]]; then
         echo "$file"
     fi

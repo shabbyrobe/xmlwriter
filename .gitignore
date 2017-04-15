@@ -4,3 +4,4 @@ tester/tester
 *.dSYM
 *.test
 *.prof
+.vagrant

@@ -2,10 +2,9 @@
 #include <stdlib.h>
 #include <stdbool.h>
 #include <string.h>
-#include <ctype.h>
-#include <assert.h>
 
-#include "crapatts.c"
+#include "string.c"
+#include "xml.c"
 
 // libxml writes the encoding in all caps regardless of 
 // the input. if we override the encoding in the go version
@@ -14,28 +13,6 @@
 // that crap attribute parser i wrote when i thought i had
 // to handle the <?xml declaration by hand really came in handy
 // in the end!!
-
-#ifndef HAVE_STRNDUP
-char *strndup(const char *s, size_t n)
-{
-    char* new = malloc(n+1);
-    if (new) {
-        strncpy(new, s, n);
-        new[n] = '\0';
-    }
-    return new;
-}
-#endif
-
-char* strtoupper(char* s) {
-    assert(s != NULL);
-    char* p = s;
-    while (*p != '\0') {
-        *p = toupper(*p);
-        p++;
-    }
-    return s;
-}
 
 int main(void) {
     #define READ_SIZE 8192

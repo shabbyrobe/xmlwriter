@@ -7,7 +7,12 @@
 #include <libxml/xmlreader.h>
 #include <libxml/xmlwriter.h>
 
-// TODO: error reasons!
+#include "string.c"
+
+enum ct_err {
+    CT_OK = 0,
+    CT_ERR = 1,
+};
 
 const xmlChar *kind_all_str           = (xmlChar*)"all";
 const xmlChar *kind_attr_str          = (xmlChar*)"attr";
@@ -179,46 +184,72 @@ struct script {
     struct command *tail;
 };
 
-struct run_end {
+struct ctx_end {
     struct params *params;
-    struct run_end *parent;
+    struct ctx_end *parent;
 };
 
-struct run_context {
+struct ct_ctx {
     xmlTextWriterPtr writer;
     struct command *cmd;
     struct params *params;
-    struct run_end *end;
+    struct ctx_end *end;
     bool in_dtd;
+
+    char *error;
+    int error_code;
+    void (*error_free)(void *p);
 };
 
 struct params {
     void (*free)(void *p);
-    int (*run)(struct run_context *ctx);
+    int (*run)(struct ct_ctx *ctx);
 };
 
-void run_end_push(struct run_context *ctx, struct params *params) {
-    struct run_end *end = malloc(sizeof(struct run_end));
+void ctx_end_push(struct ct_ctx *ctx, struct params *params) {
+    struct ctx_end *end = malloc(sizeof(struct ctx_end));
     end->params = params;
     end->parent = ctx->end;
     ctx->end = end;
 }
 
+int ctx_errf(struct ct_ctx *ctx, int code, char *fmt, ...) {
+    if (ctx->error != NULL && ctx->error_free != NULL) {
+        ctx->error_free(ctx->error);
+    }
+    va_list args;
+    va_start(args, fmt);
+    ctx->error_code = code;
+    ctx->error_free = free;
+    vasprintf(&ctx->error, fmt, args);
+    va_end(args);
+    return code;
+}
+
+int ctx_err(struct ct_ctx *ctx, int code, char *error) {
+    if (ctx->error != NULL && ctx->error_free != NULL) {
+        ctx->error_free(ctx->error);
+    }
+    ctx->error_code = code;
+    ctx->error = error;
+    return code;
+}
+
 // this deletes nodes while their run method might still be executing.
-void run_end_pop(struct run_context *ctx) {
+void ctx_end_pop(struct ct_ctx *ctx) {
     if (ctx->end != NULL) {
-        struct run_end *last = ctx->end;
+        struct ctx_end *last = ctx->end;
         ctx->end = ctx->end->parent;
         last->params->free(last->params);
         free(last);
     }
 }
 
-void run_end_destroy(struct run_context *ctx) {
-    struct run_end *end = ctx->end;
+void ctx_end(struct ct_ctx *ctx) {
+    struct ctx_end *end = ctx->end;
     while (end) {
         // end->parent will get freed by end->params->run
-        struct run_end *next = end->parent;
+        struct ctx_end *next = end->parent;
         ctx->params = end->params;
         end->params->free(end->params);
         free(end);
@@ -226,13 +257,21 @@ void run_end_destroy(struct run_context *ctx) {
     }
 }
 
+void ctx_deinit(struct ct_ctx *ctx) {
+    ctx_end(ctx);
+    if (ctx->error != NULL && ctx->error_free != NULL) {
+        ctx->error_free(ctx->error);
+    }
+}
+
+// {{{ writeattr
 struct params_write_attr {
     struct params params;
     xmlChar *prefix;
     xmlChar *uri;
 };
 
-int params_write_attr_run(struct run_context *ctx) {
+int params_write_attr_run(struct ct_ctx *ctx) {
     struct params_write_attr *p = (struct params_write_attr *)ctx->params;
     int b = 0;
     if (p->prefix != NULL || p->uri != NULL) {
@@ -265,7 +304,9 @@ struct params_write_attr *params_write_attr_create(
     *valid = true;
     return p;
 }
+// }}} write_attr
 
+// {{{ write_dtd_entnty
 struct params_write_dtd_entity {
     struct params params;
     bool is_pe;
@@ -274,7 +315,7 @@ struct params_write_dtd_entity {
     xmlChar *public_id;
 };
 
-int params_write_dtd_entity_run(struct run_context *ctx) {
+int params_write_dtd_entity_run(struct ct_ctx *ctx) {
     struct params_write_dtd_entity *p = (struct params_write_dtd_entity *)ctx->params;
 
     // TODO: this doesn't work with single-quoted entity content.
@@ -322,13 +363,15 @@ struct params_write_dtd_entity *params_write_dtd_entity_create(
     p->public_id = public_id;
     return p;
 }
+// }}} write_dtd_entity
 
+// {{{ write_pi
 struct params_write_pi {
     struct params params;
     xmlChar *target;
 };
 
-int params_write_pi_run(struct run_context *ctx) {
+int params_write_pi_run(struct ct_ctx *ctx) {
     struct params_write_pi *p = (struct params_write_pi *)ctx->params;
     return xmlTextWriterWritePI(ctx->writer, p->target, ctx->cmd->content) < 0;
 }
@@ -352,7 +395,9 @@ struct params_write_pi *params_write_pi_create(
     p->target = target;
     return p;
 }
+// }}} write_pi
 
+// {{{ write_cdata
 struct params_write_cdata {
     struct params params;
 };
@@ -362,7 +407,7 @@ void params_write_cdata_free(void *f) {
     free(p);
 }
 
-int params_write_cdata_run(struct run_context *ctx) {
+int params_write_cdata_run(struct ct_ctx *ctx) {
     return xmlTextWriterWriteCDATA(ctx->writer, ctx->cmd->content) < 0;
 }
 
@@ -373,7 +418,9 @@ struct params_write_cdata *params_write_cdata_create(bool *valid) {
     p->params.run = params_write_cdata_run;
     return p;
 }
+// }}} write_cdata
 
+// {{{ write_cdata_content
 struct params_write_cdata_content {
     struct params params;
 };
@@ -383,7 +430,7 @@ void params_write_cdata_content_free(void *f) {
     free(p);
 }
 
-int params_write_cdata_content_run(struct run_context *ctx) {
+int params_write_cdata_content_run(struct ct_ctx *ctx) {
     return xmlTextWriterWriteRaw(ctx->writer, ctx->cmd->content) < 0;
 }
 
@@ -394,7 +441,9 @@ struct params_write_cdata_content *params_write_cdata_content_create(bool *valid
     p->params.run = params_write_cdata_content_run;
     return p;
 }
+// }}} write_cdata_content
 
+// {{{ write_comment
 struct params_write_comment {
     struct params params;
 };
@@ -404,7 +453,7 @@ void params_write_comment_free(void *f) {
     free(p);
 }
 
-int params_write_comment_run(struct run_context *ctx) {
+int params_write_comment_run(struct ct_ctx *ctx) {
     if (ctx->in_dtd) {
         // HACK: libxml won't allow comments to be written using 
         // xmlTextWriterWriteComment inside a DTD. it always returns
@@ -431,7 +480,9 @@ struct params_write_comment *params_write_comment_create(bool *valid) {
     p->params.run = params_write_comment_run;
     return p;
 }
+// }}} write_comment
 
+// {{{ write_dtd_attr
 struct params_write_dtd_attr {
     struct params params;
     xmlChar *type;
@@ -448,7 +499,7 @@ void params_write_dtd_attr_free(void *f) {
     free(p);
 }
 
-int params_write_dtd_attr_run(struct run_context *ctx) {
+int params_write_dtd_attr_run(struct ct_ctx *ctx) {
     struct params_write_dtd_attr *p = (struct params_write_dtd_attr *)ctx->params;
     int ret = 0;
     if ((ret = xmlTextWriterWriteRaw(ctx->writer, (xmlChar*)" ")) < 0) {
@@ -516,7 +567,9 @@ struct params_write_dtd_attr *params_write_dtd_attr_create(
     }
     return p;
 }
+// }}} write_dtd_attr
 
+// {{{ write_dtd_elem
 struct params_write_dtd_elem {
     struct params params;
 };
@@ -526,7 +579,7 @@ void params_write_dtd_elem_free(void *f) {
     free(p);
 }
 
-int params_write_dtd_elem_run(struct run_context *ctx) {
+int params_write_dtd_elem_run(struct ct_ctx *ctx) {
     return xmlTextWriterWriteDTDElement(ctx->writer, ctx->cmd->name, ctx->cmd->content) < 0;
 }
 
@@ -537,7 +590,9 @@ struct params_write_dtd_elem *params_write_dtd_elem_create(bool *valid) {
     p->params.run = params_write_dtd_elem_run;
     return p;
 }
+// }}} write_dtd_elem
 
+// {{{ write_raw
 struct params_write_raw {
     struct params params;
 };
@@ -547,7 +602,7 @@ void params_write_raw_free(void *f) {
     free(p);
 }
 
-int params_write_raw_run(struct run_context *ctx) {
+int params_write_raw_run(struct ct_ctx *ctx) {
     return xmlTextWriterWriteRaw(ctx->writer, ctx->cmd->content) < 0;
 }
 
@@ -575,7 +630,9 @@ struct params_write_raw *params_write_raw_create(xmlChar *next, bool *valid) {
     p->params.run = params_write_raw_run;
     return p;
 }
+// }}} write_raw
 
+// {{{ write_text
 struct params_write_text {
     struct params params;
 };
@@ -585,7 +642,7 @@ void params_write_text_free(void *f) {
     free(p);
 }
 
-int params_write_text_run(struct run_context *ctx) {
+int params_write_text_run(struct ct_ctx *ctx) {
     return xmlTextWriterWriteString(ctx->writer, ctx->cmd->content) < 0;
 }
 
@@ -596,7 +653,9 @@ struct params_write_text *params_write_text_create(bool *valid) {
     p->params.run = params_write_text_run;
     return p;
 }
+// }}} write_text
 
+// {{{ end_dtd
 struct params_end_dtd {
     struct params params;
 };
@@ -606,7 +665,7 @@ void params_end_dtd_free(void *f) {
     free(p);
 }
 
-int params_end_dtd_run(struct run_context *ctx) {
+int params_end_dtd_run(struct ct_ctx *ctx) {
     ctx->in_dtd = false;
     return xmlTextWriterEndDTD(ctx->writer) < 0;
 }
@@ -618,18 +677,20 @@ struct params_end_dtd *params_end_dtd_create(bool *valid) {
     p->params.run = params_end_dtd_run;
     return p;
 }
+// }}} end_dtd
 
+// {{{ start_dtd
 struct params_start_dtd {
     struct params params;
     xmlChar *public_id;
     xmlChar *system_id;
 };
 
-int params_start_dtd_run(struct run_context *ctx) {
+int params_start_dtd_run(struct ct_ctx *ctx) {
     struct params_start_dtd *p = (struct params_start_dtd *)ctx->params;
     ctx->in_dtd = true;
     bool valid = true;
-    run_end_push(ctx, (struct params *)params_end_dtd_create(&valid));
+    ctx_end_push(ctx, (struct params *)params_end_dtd_create(&valid));
     return xmlTextWriterStartDTD(ctx->writer, ctx->cmd->name, p->public_id, p->system_id) < 0;
 }
 
@@ -655,14 +716,16 @@ struct params_start_dtd *params_start_dtd_create(
     p->system_id = system_id;
     return p;
 }
+// }}} end_dtd
 
+// {{{ write_notation
 struct params_write_notation {
     struct params params;
     xmlChar *public_id;
     xmlChar *system_id;
 };
 
-int params_write_notation_run(struct run_context *ctx) {
+int params_write_notation_run(struct ct_ctx *ctx) {
     struct params_write_notation *p = (struct params_write_notation *)ctx->params;
     return xmlTextWriterWriteDTDNotation(ctx->writer, ctx->cmd->name, p->public_id, p->system_id) < 0;
 }
@@ -689,13 +752,15 @@ struct params_write_notation *params_write_notation_create(
     p->system_id = system_id;
     return p;
 }
+// }}} write_notation
 
+// {{{ end_elem
 struct params_end_elem {
     struct params params;
     bool full;
 };
 
-int params_end_elem_run(struct run_context *ctx) {
+int params_end_elem_run(struct ct_ctx *ctx) {
     struct params_end_elem *p = (struct params_end_elem *)ctx->params;
     int rc = 0;
     if (p->full) {
@@ -703,7 +768,7 @@ int params_end_elem_run(struct run_context *ctx) {
     } else {
         rc = xmlTextWriterEndElement(ctx->writer) < 0;
     }
-    run_end_pop(ctx);
+    ctx_end_pop(ctx);
     return rc;
 }
 
@@ -729,18 +794,20 @@ struct params_end_elem *params_end_elem_create(
     }
     return p;
 }
+// }}} end_elem
 
+// {{{ start_elem
 struct params_start_elem {
     struct params params;
     xmlChar *prefix;
     xmlChar *uri;
 };
 
-int params_start_elem_run(struct run_context *ctx) {
+int params_start_elem_run(struct ct_ctx *ctx) {
     struct params_start_elem *p = (struct params_start_elem *)ctx->params;
 
     bool valid = true;
-    run_end_push(ctx, (struct params *)params_end_elem_create(NULL, &valid));
+    ctx_end_push(ctx, (struct params *)params_end_elem_create(NULL, &valid));
 
     if (p->prefix != NULL || p->uri != NULL) {
         return xmlTextWriterStartElementNS(ctx->writer, p->prefix, ctx->cmd->name, p->uri) < 0;
@@ -771,7 +838,9 @@ struct params_start_elem *params_start_elem_create(
     p->uri = uri;
     return p;
 }
+// }}} start_elem
 
+// {{{ end_cdata
 struct params_end_cdata {
     struct params params;
 };
@@ -781,9 +850,9 @@ void params_end_cdata_free(void *f) {
     free(p);
 }
 
-int params_end_cdata_run(struct run_context *ctx) {
+int params_end_cdata_run(struct ct_ctx *ctx) {
     int rc = xmlTextWriterEndCDATA(ctx->writer) < 0;
-    run_end_pop(ctx);
+    ctx_end_pop(ctx);
     return rc;
 }
 
@@ -794,7 +863,9 @@ struct params_end_cdata *params_end_cdata_create(bool *valid) {
     p->params.run = params_end_cdata_run;
     return p;
 }
+// }}} end_cdata
 
+// {{{ start_cdata
 struct params_start_cdata {
     struct params params;
 };
@@ -804,9 +875,9 @@ void params_start_cdata_free(void *f) {
     free(p);
 }
 
-int params_start_cdata_run(struct run_context *ctx) {
+int params_start_cdata_run(struct ct_ctx *ctx) {
     bool valid = true;
-    run_end_push(ctx, (struct params *)params_end_cdata_create(&valid));
+    ctx_end_push(ctx, (struct params *)params_end_cdata_create(&valid));
     return xmlTextWriterStartCDATA(ctx->writer) < 0;
 }
 
@@ -817,7 +888,9 @@ struct params_start_cdata *params_start_cdata_create(bool *valid) {
     p->params.run = params_start_cdata_run;
     return p;
 }
+// }}} start_cdata
 
+// {{{ end_comment
 struct params_end_comment {
     struct params params;
 };
@@ -827,9 +900,9 @@ void params_end_comment_free(void *f) {
     free(p);
 }
 
-int params_end_comment_run(struct run_context *ctx) {
+int params_end_comment_run(struct ct_ctx *ctx) {
     int rc = xmlTextWriterEndComment(ctx->writer) < 0;
-    run_end_pop(ctx);
+    ctx_end_pop(ctx);
     return rc;
 }
 
@@ -840,7 +913,9 @@ struct params_end_comment *params_end_comment_create(bool *valid) {
     p->params.run = params_end_comment_run;
     return p;
 }
+// }}} end_comment
 
+// {{{ start_comment
 struct params_start_comment {
     struct params params;
 };
@@ -850,9 +925,9 @@ void params_start_comment_free(void *f) {
     free(p);
 }
 
-int params_start_comment_run(struct run_context *ctx) {
+int params_start_comment_run(struct ct_ctx *ctx) {
     bool valid = true;
-    run_end_push(ctx, (struct params *)params_end_comment_create(&valid));
+    ctx_end_push(ctx, (struct params *)params_end_comment_create(&valid));
     return xmlTextWriterStartComment(ctx->writer) < 0;
 }
 
@@ -863,7 +938,9 @@ struct params_start_comment *params_start_comment_create(bool *valid) {
     p->params.run = params_start_comment_run;
     return p;
 }
+// }}} start_comment
 
+// {{{ end_doc
 struct params_end_doc {
     struct params params;
 };
@@ -873,9 +950,9 @@ void params_end_doc_free(void *f) {
     free(p);
 }
 
-int params_end_doc_run(struct run_context *ctx) {
+int params_end_doc_run(struct ct_ctx *ctx) {
     int rc = xmlTextWriterEndDocument(ctx->writer) < 0;
-    run_end_pop(ctx);
+    ctx_end_pop(ctx);
     return rc;
 }
 
@@ -886,7 +963,9 @@ struct params_end_doc *params_end_doc_create(bool *valid) {
     p->params.run = params_end_doc_run;
     return p;
 }
+// }}} end_doc
 
+// {{{ start_doc
 struct params_start_doc {
     struct params params;
     xmlChar *encoding;
@@ -902,11 +981,11 @@ void params_start_doc_free(void *f) {
     free(p);
 }
 
-int params_start_doc_run(struct run_context *ctx) {
+int params_start_doc_run(struct ct_ctx *ctx) {
     struct params_start_doc *p = (struct params_start_doc *)ctx->params;
 
     bool valid = true;
-    run_end_push(ctx, (struct params *)params_end_doc_create(&valid));
+    ctx_end_push(ctx, (struct params *)params_end_doc_create(&valid));
 
     return xmlTextWriterStartDocument(
         ctx->writer, 
@@ -927,7 +1006,9 @@ struct params_start_doc *params_start_doc_create(xmlChar *encoding, xmlChar *ver
     p->standalone = standalone;
     return p;
 }
+// }}} start_doc
 
+// {{{ end_dtd_attlist
 struct params_end_dtd_attlist {
     struct params params;
 };
@@ -937,9 +1018,9 @@ void params_end_dtd_attlist_free(void *f) {
     free(p);
 }
 
-int params_end_dtd_attlist_run(struct run_context *ctx) {
+int params_end_dtd_attlist_run(struct ct_ctx *ctx) {
     int rc = xmlTextWriterEndDTDAttlist(ctx->writer) < 0;
-    run_end_pop(ctx);
+    ctx_end_pop(ctx);
     return rc;
 }
 
@@ -950,7 +1031,9 @@ struct params_end_dtd_attlist *params_end_dtd_attlist_create(bool *valid) {
     p->params.run = params_end_dtd_attlist_run;
     return p;
 }
+// }}} end_dtd_attlist 
 
+// {{{ start_dtd_attlist
 struct params_start_dtd_attlist {
     struct params params;
 };
@@ -960,9 +1043,9 @@ void params_start_dtd_attlist_free(void *f) {
     free(p);
 }
 
-int params_start_dtd_attlist_run(struct run_context *ctx) {
+int params_start_dtd_attlist_run(struct ct_ctx *ctx) {
     bool valid = true;
-    run_end_push(ctx, (struct params *)params_end_dtd_attlist_create(&valid));
+    ctx_end_push(ctx, (struct params *)params_end_dtd_attlist_create(&valid));
 
     return xmlTextWriterStartDTDAttlist(ctx->writer, ctx->cmd->name) < 0;
 }
@@ -974,7 +1057,9 @@ struct params_start_dtd_attlist *params_start_dtd_attlist_create(bool *valid) {
     p->params.run = params_start_dtd_attlist_run;
     return p;
 }
+// }}} start_dtd_attlist
 
+// {{{ end_all
 struct params_end_all {
     struct params params;
 };
@@ -984,14 +1069,14 @@ void params_end_all_free(void *f) {
     free(p);
 }
 
-int params_end_all_run(struct run_context *ctx) {
-    struct run_end *end = ctx->end;
+int params_end_all_run(struct ct_ctx *ctx) {
+    struct ctx_end *end = ctx->end;
     int rc = 0;
 
     struct params *oldparams = ctx->params;
     while (end) {
         // end->parent will get freed by end->params->run
-        struct run_end *next = end->parent;
+        struct ctx_end *next = end->parent;
         ctx->params = end->params;
 
         if ((rc = end->params->run(ctx)) != 0) {
@@ -1000,7 +1085,7 @@ int params_end_all_run(struct run_context *ctx) {
         end = next;
     }
     ctx->params = oldparams;
-    run_end_destroy(ctx);
+    ctx_end(ctx);
     return 0;
 }
 
@@ -1011,6 +1096,7 @@ struct params_end_all *params_end_all_create(bool *valid) {
     p->params.run = params_end_all_run;
     return p;
 }
+// }}} end_all
 
 int script_init(struct script *script) {
     (void)script;
@@ -1322,7 +1408,7 @@ int script_run(struct script *script, bool indent) {
     int index = 0;
 
     struct command *current = script->command;
-    struct run_context ctx = {
+    struct ct_ctx ctx = {
         .writer = writer,
         .end = NULL,
     };
@@ -1350,7 +1436,7 @@ int script_run(struct script *script, bool indent) {
     xmlTextWriterFlush(writer);
 
 cleanup:;
-    run_end_destroy(&ctx);
+    ctx_deinit(&ctx);
     xmlFreeTextWriter(writer);
     return rc;
 }

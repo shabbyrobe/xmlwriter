@@ -105,6 +105,8 @@ func (r *XWRunner) activate(enc *string) error {
 		switch ev {
 		case "ISO-8859-1":
 			enc = charmap.ISO8859_1.NewEncoder()
+		case "WINDOWS-1252":
+			enc = charmap.Windows1252.NewEncoder()
 		default:
 			return fmt.Errorf("unsupported encoding %s", ev)
 		}
