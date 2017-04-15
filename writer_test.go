@@ -769,6 +769,8 @@ func TestWriteRaw(t *testing.T) {
 func TestAllocs(t *testing.T) {
 	w := Open(Null{})
 
+	baseline := allocs() - allocs()
+
 	before := allocs()
 	Must(w.StartDoc(Doc{}))
 	Must(w.StartElem(Elem{Name: "foo"}))
@@ -782,6 +784,6 @@ func TestAllocs(t *testing.T) {
 	Must(w.EndElemFull("bar"))
 	Must(w.EndDoc())
 	after := allocs()
-	tt.Equals(t, uint64(0), after-before)
+	tt.Equals(t, uint64(baseline), after-before)
 	w.Flush()
 }
