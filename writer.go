@@ -294,15 +294,21 @@ func (w *Writer) EndAll() error {
 
 // EndToDepth  ends all nodes in the stack up to the supplied depth. The last
 // node must match NodeKind and, if provided and applicable for the node type,
-// the name. This is useful if you want to ensure that everything is closed
-// inside a function:
+// the name. This is useful if you want to ensure that everything you open inside
+// a particular scope is closed at the end:
 //
-//     func () {
-//         d := w.Depth()
-//         w.Start(Elem{Name: "pants"})
-//         defer w.EndToDepth(d, NodeElem, "pants")
-//         // lotsa stuff
-//     }
+//	func outer() {
+//		w.Start(Elem{Name: "pants"})
+//		inner()
+//      // result:
+//      // <pants><foo><bar/></foo>
+//	}
+//	func inner() {
+//		d := w.Depth()
+//		defer w.EndToDepth(d, NodeElem)
+//		w.Start(Elem{Name: "foo"})
+//		w.Start(Elem{Name: "bar"})
+//	}
 //
 func (w *Writer) EndToDepth(depth int, kind NodeKind, name ...string) error {
 	limit := depth + 1
