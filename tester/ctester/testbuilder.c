@@ -161,7 +161,7 @@ void command_end_content_len(struct xml_ctx *ctx, const expat_ch *content, size_
     if (len > 0 && content != NULL) {
         lxml_ch *copy = xmlCharStrndup(content, len);
         xmlTextWriterWriteString(ctx->writer, copy);
-        free(copy);
+        xmlFree(copy);
     }
     xmlTextWriterEndElement(ctx->writer);
 }
@@ -453,7 +453,10 @@ void xmlDumpEntityContent(xmlBufferPtr buf, const xmlChar *content, int len) {
         if (base != cur)
             xmlBufferAdd(buf, base, cur - base);
     } else {
-        xmlBufferWriteChar(buf, (char *)content);
+        // content is not null terminated
+        lxml_ch *copy = xmlCharStrndup((char*)content, len);
+        xmlBufferWriteChar(buf, (char *)copy);
+        xmlFree(copy);
     }
 }
 
