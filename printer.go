@@ -144,7 +144,14 @@ func (p printer) writeExternalID(publicID string, systemID string, enforce bool)
 
 	} else if publicID != "" {
 		// PUBLIC pubID systemID
-		p.WriteString("PUBLIC ")
+		if enforce {
+			if systemID == "" {
+				return fmt.Errorf("xmlwriter: DTD public ID provided but system ID missing")
+			}
+			if err := CheckPubID(publicID); err != nil {
+				return err
+			}
+		}
 		return p.writePublicID(publicID, systemID, enforce)
 	}
 	return nil
@@ -196,17 +203,20 @@ func (p printer) writeEntityValue(value string, enforce bool) error {
 
 func (p printer) writePublicID(publicID string, systemID string, enforce bool) error {
 	if enforce {
-		if systemID == "" {
-			return fmt.Errorf("xmlwriter: DTD public ID provided but system ID missing")
-		}
-		if err := CheckPubID(publicID); err != nil {
-			return err
+		if len(publicID) < 0 {
+			return fmt.Errorf("xmlwriter: public ID must not be empty")
 		}
 	}
+	p.WriteString("PUBLIC ")
 	p.WriteByte('"')
 	p.WriteString(publicID)
-	p.WriteString("\" ")
-	return p.writeSystemID(systemID, enforce)
+	if systemID != "" {
+		p.WriteString("\" ")
+		return p.writeSystemID(systemID, enforce)
+	} else {
+		p.WriteString("\"")
+		return p.cachedWriteError()
+	}
 }
 
 func (p printer) printAttr(name, value string, enforce bool) error {

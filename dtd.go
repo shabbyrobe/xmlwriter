@@ -339,8 +339,14 @@ func (n Notation) write(w *Writer) error {
 	w.printer.WriteString("<!NOTATION ")
 	w.printer.WriteString(n.Name)
 	w.printer.WriteByte(' ')
-	if err := w.printer.writeExternalID(n.PublicID, n.SystemID, w.Enforce); err != nil {
-		return err
+	if n.SystemID != "" {
+		if err := w.printer.writeExternalID(n.PublicID, n.SystemID, w.Enforce); err != nil {
+			return err
+		}
+	} else if n.PublicID != "" {
+		if err := w.printer.writePublicID(n.PublicID, n.SystemID, w.Enforce); err != nil {
+			return err
+		}
 	}
 	w.printer.WriteString(">")
 	if w.Indenter != nil {

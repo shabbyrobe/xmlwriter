@@ -345,11 +345,11 @@ func TestNest(t *testing.T) {
 }
 
 func TestNotation(t *testing.T) {
+	tt.Equals(t, `<!NOTATION pants PUBLIC "pub">`,
+		doWrite(Notation{Name: "pants", PublicID: "pub"}))
 	tt.Equals(t, `<!NOTATION pants PUBLIC "pub" "sys">`,
 		doWrite(Notation{Name: "pants", SystemID: "sys", PublicID: "pub"}))
 
-	tt.Pattern(t, `(?i)public ID provided but system ID missing`,
-		doWriteErrMsg(Notation{Name: "hi", PublicID: "pub"}))
 	tt.Pattern(t, `(?i)requires external ID`,
 		doWriteErrMsg(Notation{Name: "hi"}))
 	tt.Pattern(t, `(?i)name must not be empty`,
