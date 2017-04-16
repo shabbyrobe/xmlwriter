@@ -514,12 +514,15 @@ int cmd_query(int cargc, char *cargv[]) {
     int rc = OK;
     sqlite3 *db = NULL;
     sqlite3_stmt *stmt = NULL;
-    bool all = false;
+    bool include_errors = false;
+    bool include_dupes = false;
 
     char c;
-    while ((c = getopt(cargc, cargv, "a")) != -1) {
+    while ((c = getopt(cargc, cargv, "aed")) != -1) {
         switch (c) {
-        case 'a' : all = true; break;
+        case 'a' : include_errors = include_dupes = true; break;
+        case 'e' : include_errors = true; break;
+        case 'd' : include_dupes  = true; break;
         default  : return ERR_USAGE;
         }
     }
@@ -547,12 +550,15 @@ int cmd_query(int cargc, char *cargv[]) {
     // TODO: status=0 should be disabled by a flag
     struct buf buf = {0};
     buf_strappend(&buf, "SELECT file FROM xml WHERE ");
-    if (!all) {
+    if (!include_errors) {
         buf_strappend(&buf, "status=0 AND ");
     }
     buf_strappend(&buf, "(");
     buf_strappend(&buf, clause);
     buf_strappend(&buf, ")");
+    if (!include_dupes) {
+        buf_strappend(&buf, " GROUP BY hash");
+    }
 
     if ((sqlite3_prepare_v2(db, buf.bytes, -1, &stmt, NULL)) != SQLITE_OK) {
         rc = ERR_DB_SELECT; goto cleanup;
