@@ -1,5 +1,5 @@
 /**
- * XML normaliser
+ * XML normaliser (requires UTF-8 input)
  *
  * - Sorts attributes alphabetically
  * - Ensures numeric entities all have the same style of representation
@@ -35,6 +35,14 @@ enum ent_num_mode {
     ENT_NUM_HEX = 2,
 };
 
+enum state {
+    IN_NONE = 0,
+    IN_DOC = 0,
+    IN_ELEM = 1,
+    IN_DTD = 2,
+    IN_CDATA = 3,
+};
+
 bool debug = false;
 
 struct attr {
@@ -45,6 +53,10 @@ struct attr {
 struct ctx {
     xmlTextWriterPtr writer;
     XML_Parser parser;
+    
+    enum state *stack;
+    ssize_t stack_cap;
+    ssize_t stack_depth;
 
     enum ent_num_mode ent_num_mode;
     char *error;
@@ -55,6 +67,27 @@ struct ctx {
     struct attr *attrs;
     size_t attrs_cap;
 };
+
+void ctx_push(struct ctx *ctx, enum state state) {
+    if (ctx->stack_depth + 1 >= ctx->stack_cap) {
+        ctx->stack_cap = ctx->stack_cap > 0 ? ctx->stack_cap * 2 : 32;
+        ctx->stack = realloc(ctx->stack, ctx->stack_cap * sizeof(enum state));
+    }
+    ctx->stack_depth++;
+    ctx->stack[ctx->stack_depth] = state;
+}
+
+int ctx_pop(struct ctx *ctx, enum state state) {
+    if (ctx->stack_depth < 0) {
+        return IN_NONE;
+    }
+    enum state ret = ctx->stack[ctx->stack_depth];
+    if (ret != state) {
+        return 1;
+    }
+    ctx->stack_depth--;
+    return 0;
+}
 
 static int ctx_errf(struct ctx *ctx, int code, char *fmt, ...) {
     if (ctx->error != NULL && ctx->error_free != NULL) {
@@ -82,6 +115,7 @@ void ctx_deinit(struct ctx *ctx) {
     if (ctx->error != NULL && ctx->error_free != NULL) {
         ctx->error_free(ctx->error);
     }
+    free(ctx->stack);
 }
 
 bool str_has_prefix(const char *str, const char *pre)
@@ -133,11 +167,6 @@ void xml_elem_start(void *user_data, const expat_ch *name, const expat_ch **atts
     }
     
     qsort(ctx->attrs, attlen, sizeof(struct attr), attr_comp);
-
-    for (size_t i = 0; i < attlen; i++) {
-        xmlTextWriterWriteAttribute(ctx->writer, 
-            (lxml_ch*)ctx->attrs[i].name, (lxml_ch*)ctx->attrs[i].value);
-    }
 }
 
 void xml_default(void *user_data, const expat_ch *s, int len) {
@@ -248,6 +277,15 @@ int main() {
     xmlTextWriterFlush(writer);
 
 cleanup:
+    if (ctx.error_code > 0) {
+        rc = ctx.error_code;
+        if (ctx.error != NULL) {
+            fprintf(stderr, "%s\n", ctx.error);
+        } else {
+            fprintf(stderr, "parsing failed with unknown error %d\n", ctx.error_code);
+        }
+    }
+
     ctx_deinit(&ctx);
     free(ctx.attrs);
     XML_ParserFree(parser);

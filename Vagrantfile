@@ -15,8 +15,6 @@ Vagrant.configure(2) do |config|
 
   config.vm.provision "shell", inline: $init
 
-  # config.vm.synced_folder "../", "/srv/vidiot"
-
   config.vm.box = "boxcutter/ubuntu1604"
 
   if Vagrant.has_plugin?("vagrant-cachier")

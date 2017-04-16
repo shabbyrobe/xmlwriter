@@ -66,8 +66,8 @@ run it through an XML reader (in this case expat because none of libxml2's
 various readers did the job properly), and emit `<command>` elements that would
 instruct either of our two test binaries to rebuild the same XML as we started with?
 
-Enter the `testbuilder`. That's what that does. Pipe any XML file at all to it
-and it will create a test according the above spec:
+Enter the `testbuilder`. That's what that does. Pipe any XML file -- preferably
+UTF-8 encoded -- to it and it will create a test according the above spec:
 
     # make a test case from an XML file
     cat ctester/test/testbuilder/dtd-04-in.xml | ctester/testbuilder
@@ -79,7 +79,7 @@ results:
     cat ctester/test/testbuilder/dtd-04-in.xml | ctester/testbuilder | gotester/gotester
     cat ctester/test/testbuilder/dtd-04-in.xml | ctester/testbuilder | ctester/ctester
 
-OR you can use `./run.sh` and have it do all that for you:
+Or you can use `./run.sh` and have it do all that for you:
 
     ./run.sh -f /path/to/your.xml
 
@@ -93,9 +93,17 @@ Thank you, that will do nicely.
     ./run.sh -l /path/to/file/containing/list/of/xml/files.txt
     ./run.sh -l <( find /path/to/tree/containing/xmls -type f -name '*.xml' )
 
+You can also index them into a table and use that to drive the list. This makes
+it easier to find files to test with that exhibit certain characteristics that
+you might want to test:
+
+    $ find / -type f -name '*.xml' | ctester/indexer index /path/to/db.sqlite
+    $ ctester/indexer query 'elems > 0 OR nselems > 0'
+    $ ./run.sh -d /path/to/db.sqlite -q 'elems > 0 OR nselems > 0'
+
 To build:
 
-    sudo apt install libxml2
+    sudo apt install libxml2 iconv
     ( cd ctester; make )
 
 This process is a bit fraught and requires a few additional terrible C programs,
@@ -103,23 +111,24 @@ also found in the `ctester` folder along with the venerable `diff` utility.
 Keep in mind that all of this crap is quite weakly tested, but it's a damn
 sight faster and more accurate than the xml differs I tried.
 
-`nlfix`
-    `xmllint` doesn't coalesce non-significant whitespace the same way if
-    the newlines aren't normalised first. `expat` (used in testbuilder)
-    always replaces CR with LF (see lib/xmlparse.c:2629 or thereabouts),
-    so `testbuilder` won't emit CR even if it is present in the original
-    document. Y U NO dos2unix? Slower, more complicated, less predictable.
 
-`attrsorter`
-    Attributes can get written in any order, but elements with the same
-    attributes are semantically identical regardless of the order. This
-    utility re-parses the xml and sorts the attributes so they can be
-    compared.
+Known Issues
+------------
 
-`encfixer`
-    `libxml` won't allow an arbitrarily cased encoding, so if the input
-    file supplies one, for e.g. 'utf-8' instead of 'UTF-8', there's no
-    way to get the C writer to emit the lowercase version. This re-
-    parses the encoding and uppercases it, then thumps the rest of the file
-    to stdout unmolested.
+If your input XML contains the entities `&#xD;` or `&#13;`, they will cause the
+output diff to fail.
+
+Doctype entities will appear different if the input contains entities - expat
+expands them and no part of our terrible pipeline of normalisation makes it
+easy to make them diffable.
+
+Different encodings are run through iconv to produce UTF-8 before the testbuilder
+is run.
+
+Input must be parseable by expat - many files on my hard drive are not.
+
+Input must be a well-formed XML document: this means it must have an xml declaration
+at the top and one and only one root element. Many files with the .xml
+extension on my hard drive do not satisfy this.
+
 

@@ -6,7 +6,7 @@
 #include <string.h>
 #include <stdbool.h>
 
-static char *expat_errors[] = {
+char *expat_errors[] = {
   [XML_ERROR_NONE] = "XML_ERROR_NONE",
   [XML_ERROR_NO_MEMORY] = "XML_ERROR_NO_MEMORY",
   [XML_ERROR_SYNTAX] = "XML_ERROR_SYNTAX",
@@ -139,7 +139,7 @@ void crap_atts_free(char **atts) {
 char *raw_encoding_extract(char *buffer, size_t len) {
     char *ret = NULL;
 
-    if (len > 5 && strncmp(buffer, "<?xml", 5) == 0) {
+    if (len > 6 && strncmp(buffer, "<?xml ", 6) == 0) {
         char **atts = NULL;
         char *bufptr = buffer + 5;
         int buflen = len;

@@ -1,6 +1,7 @@
 junk/junk
 tester/gotester/gotester
 tester/tester
+tester/magic.mgc
 *.dSYM
 *.test
 *.prof

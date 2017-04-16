@@ -425,25 +425,6 @@ void xml_default(void *user_data, const expat_ch *s, int len) {
     }
 }
 
-void xml_doctype_start(
-    void *user_data,
-    const expat_ch *doctypeName,
-    const expat_ch *sysid,
-    const expat_ch *pubid,
-    int has_internal_subset
-) {
-    // TODO: how do we handle this?
-    (void)has_internal_subset;
-
-    struct xml_ctx *ctx = user_data;
-    ctx->in_dtd = true;
-    command_start(ctx, "start", "dtd", __FUNCTION__);
-    command_attr(ctx->writer, "name", doctypeName);
-    command_attr(ctx->writer, "system-id", sysid);
-    command_attr(ctx->writer, "public-id", pubid);
-    command_end(ctx);
-}
-
 // this is static in libxml and not visible to us, so 
 // of course that means copypasta!
 void xmlDumpEntityContent(xmlBufferPtr buf, const xmlChar *content, int len) {
@@ -474,6 +455,25 @@ void xmlDumpEntityContent(xmlBufferPtr buf, const xmlChar *content, int len) {
     } else {
         xmlBufferWriteChar(buf, (char *)content);
     }
+}
+
+void xml_doctype_start(
+    void *user_data,
+    const expat_ch *doctypeName,
+    const expat_ch *sysid,
+    const expat_ch *pubid,
+    int has_internal_subset
+) {
+    // TODO: how do we handle this?
+    (void)has_internal_subset;
+
+    struct xml_ctx *ctx = user_data;
+    ctx->in_dtd = true;
+    command_start(ctx, "start", "dtd", __FUNCTION__);
+    command_attr(ctx->writer, "name", doctypeName);
+    command_attr(ctx->writer, "system-id", sysid);
+    command_attr(ctx->writer, "public-id", pubid);
+    command_end(ctx);
 }
 
 void xml_doctype_end(void *user_data) {
@@ -703,7 +703,7 @@ void xml_notation(
     command_start(ctx, "write", "notation", __FUNCTION__);
     command_attr(ctx->writer, "name", name);
     command_attr(ctx->writer, "system-id", system_id);
-    command_attr(ctx->writer, "system-id", public_id);
+    command_attr(ctx->writer, "public-id", public_id);
     command_end(ctx);
 }    
 
@@ -773,8 +773,8 @@ int main(int argc, char *argv[]) {
     XML_SetCharacterDataHandler(parser, xml_character_data);
     XML_SetProcessingInstructionHandler(parser, xml_pi);
     XML_SetCommentHandler(parser, xml_comment);
-    XML_SetCdataSectionHandler(parser, xml_cdata_start, xml_cdata_end);
     XML_SetDefaultHandler(parser, xml_default);
+    XML_SetCdataSectionHandler(parser, xml_cdata_start, xml_cdata_end);
     XML_SetDoctypeDeclHandler(parser, xml_doctype_start, xml_doctype_end);
 
     XML_SetEntityDeclHandler(parser, xml_entity_decl);

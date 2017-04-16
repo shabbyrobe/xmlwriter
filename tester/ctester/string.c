@@ -8,6 +8,8 @@
 #include <stdarg.h>
 #include <ctype.h>
 
+#include "string.c"
+
 char *strndup(const char *s, size_t n) {
     char* new = malloc(n+1);
     if (new) {

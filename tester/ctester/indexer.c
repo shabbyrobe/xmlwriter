@@ -1,6 +1,3 @@
-// TODO: this is just for getline. get rid of getline maybe?
-#define _POSIX_C_SOURCE 200809L
-
 #include <expat.h>
 #include <sqlite3.h>
 #include <stdio.h>

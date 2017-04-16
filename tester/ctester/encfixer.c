@@ -2,9 +2,12 @@
 #include <stdlib.h>
 #include <stdbool.h>
 #include <string.h>
+#include <getopt.h>
 
 #include "string.c"
 #include "xml.c"
+
+#define ERR_USAGE 64
 
 // libxml writes the encoding in all caps regardless of 
 // the input. if we override the encoding in the go version
@@ -14,11 +17,22 @@
 // to handle the <?xml declaration by hand really came in handy
 // in the end!!
 
-int main(void) {
+int main(int argc, char *argv[]) {
     #define READ_SIZE 8192
     char buffer[READ_SIZE];
     bool done = false;
     size_t read = 0;
+    char *forced = NULL;
+    bool delete = false;
+
+    char c;
+    while ((c = getopt(argc, argv, "f:d")) != -1) {
+        switch (c) {
+        case 'f' : forced = optarg; break;
+        case 'd' : delete = true; break;
+        default  : return ERR_USAGE;
+        }
+    }
 
     size_t len = fread(&buffer, sizeof(char), READ_SIZE, stdin);
     if (len < READ_SIZE) {
@@ -26,11 +40,11 @@ int main(void) {
     }
     read += len;
 
-    if (len > 5 && strncmp(buffer, "<?xml", 5) == 0) {
+    if (len > 6 && strncmp(buffer, "<?xml ", 6) == 0) {
         char **atts = NULL;
-        char *bufptr = buffer + 5;
+        char *bufptr = buffer + 6;
         int buflen = len;
-        buflen -= 5;
+        buflen -= 6;
         fwrite("<?xml", 1, 5, stdout);
 
         int att_read = 0;
@@ -43,10 +57,13 @@ int main(void) {
         for (int i = 0; atts[i]; i+=2) {
             if (strcmp(atts[i], "version")==0) {
                 printf(" %s=\"%s\"", atts[i], atts[i+1]);
-            } else if (strcmp(atts[i], "encoding")==0) {
-                printf(" %s=\"%s\"", atts[i], strtoupper(atts[i+1]));
             } else if (strcmp(atts[i], "standalone")==0) {
                 printf(" %s=\"%s\"", atts[i], atts[i+1]);
+            } else if (strcmp(atts[i], "encoding")==0) {
+                if (!delete) {
+                    char *out = forced != NULL ? forced : strtoupper(atts[i+1]);
+                    printf(" %s=\"%s\"", atts[i], out);
+                }
             } else {
                 fprintf(stderr, "Unparseable attribute %s\n", atts[i]);
                 return 1;
