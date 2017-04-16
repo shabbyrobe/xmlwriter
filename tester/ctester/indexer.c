@@ -7,6 +7,7 @@
 
 #include "xml.c"
 #include "string.c"
+#include "sha256.c"
 
 #define sqlite3_bind_text_name(S, N, V) (sqlite3_bind_text((S), sqlite3_bind_parameter_index((S), (N)), (V), -1, NULL))
 #define sqlite3_bind_int_name(S, N, V)  (sqlite3_bind_int ((S), sqlite3_bind_parameter_index((S), (N)), (V)))
@@ -293,6 +294,11 @@ enum idx_err xml_index(struct index_ctx *ctx, char *file) {
         return ctx_errf(&ctx->err, ERR_OPEN, "unsupported mime type %s", mime);
     }
 
+    BYTE hash[SHA256_BLOCK_SIZE] = {0};
+    char hash_str[65] = {0};
+    SHA256_CTX sha;
+    sha256_init(&sha);
+
     struct current current = {0};
     ctx->current = &current;
 
@@ -336,6 +342,9 @@ enum idx_err xml_index(struct index_ctx *ctx, char *file) {
                 done = true;
                 ctx->current->bytes = read;
             }
+            // is this legal? can't really find much on how safe it is.
+            sha256_update(&sha, (unsigned char *)buffer, len);
+
             enum XML_Status status = XML_Parse(parser, buffer, len, done);
 
             XML_Index idx = XML_GetCurrentByteIndex(parser);
@@ -361,9 +370,18 @@ enum idx_err xml_index(struct index_ctx *ctx, char *file) {
         }
     }
 
-cleanup:
+cleanup:;
+    sha256_final(&sha, hash);
+    char *hash_cur = hash_str;
+    for (size_t i = 0; i < SHA256_BLOCK_SIZE; i++) {
+        sprintf(hash_cur, "%02x", hash[i]);
+        hash_cur+=2;
+    }
+    hash_str[64] = 0;
+
     sqlite3_reset(ctx->pstmt);
     sqlite3_bind_text_name(ctx->pstmt, ":file", file);
+    sqlite3_bind_text_name(ctx->pstmt, ":hash", hash_str);
     sqlite3_bind_int_name (ctx->pstmt, ":status", ctx->err.code);
     sqlite3_bind_text_name(ctx->pstmt, ":msg", ctx->err.msg);
     sqlite3_bind_int_name (ctx->pstmt, ":bytes", ctx->current->bytes);
@@ -419,7 +437,7 @@ int cmd_index(int cargc, char *cargv[]) {
     // TODO: capture total bytes, bytes read
     if ((sqlite3_exec(db, 
         "CREATE TABLE xml("
-            "file STRING PRIMARY KEY, status INT, msg TEXT, bytes INTEGER, raw_encoding STRING, "
+            "file STRING PRIMARY KEY, hash STRING, status INT, msg TEXT, bytes INTEGER, raw_encoding STRING, "
             "encoding STRING, version STRING, elems INTEGER, "
             "nselems INTEGER, attrs INTEGER, nsattrs INTEGER, comments INTEGER, "
             "comment_bytes INTEGER, comment_max INTEGER, cdatas INTEGER, pis INTEGER, "
@@ -428,15 +446,18 @@ int cmd_index(int cargc, char *cargv[]) {
             "notations INTEGER, max_depth INTEGER);", NULL, NULL, &err)) != SQLITE_OK) {
         return ERR_DB_OPEN;
     }
+    if ((sqlite3_exec(db, "CREATE INDEX xml_hash ON xml(hash);", NULL, NULL, &err)) != SQLITE_OK) {
+        return ERR_DB_OPEN;
+    }
     if ((sqlite3_prepare_v2(db, 
         "INSERT INTO xml ("
-        "    file, status, msg, bytes, raw_encoding, encoding, version, elems, nselems, attrs, "
+        "    file, hash, status, msg, bytes, raw_encoding, encoding, version, elems, nselems, attrs, "
         "    nsattrs, comments, comment_bytes, comment_max, cdatas, "
         "    pis, dtds_public, dtds_system, dtd_elems, dtd_attlists, "
         "    dtd_entities, entity_refs, entity_refs_dec, entity_refs_hex, notations, "
         "    max_depth)"
         "VALUES ("
-        "    :file, :status, :msg, :bytes, :raw_encoding, :encoding, :version, :elems, :nselems, :attrs, "
+        "    :file, :hash, :status, :msg, :bytes, :raw_encoding, :encoding, :version, :elems, :nselems, :attrs, "
         "    :nsattrs, :comments, :comment_bytes, :comment_max, :cdatas, "
         "    :pis, :dtds_public, :dtds_system, :dtd_elems, :dtd_attlists, "
         "    :dtd_entities, :entity_refs, :entity_refs_dec, :entity_refs_hex, :notations, "
