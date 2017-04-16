@@ -443,7 +443,7 @@ void xmlDumpEntityContent(xmlBufferPtr buf, const xmlChar *content, int len) {
             } else if (*cur == '%') {
                 if (base != cur)
                     xmlBufferAdd(buf, base, cur - base);
-                    xmlBufferAdd(buf, BAD_CAST "&#x25;", 6);
+                    xmlBufferAdd(buf, BAD_CAST "&#37;", 5);
                     cur++;
                     base = cur;
             } else {

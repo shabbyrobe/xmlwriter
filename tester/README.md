@@ -103,7 +103,7 @@ you might want to test:
 
 To build:
 
-    sudo apt install libxml2 iconv
+    sudo apt install libxml2 iconv libsqlite3-dev libexpat-dev libmagic-dev
     ( cd ctester; make )
 
 This process is a bit fraught and requires a few additional terrible C programs,
@@ -131,4 +131,8 @@ Input must be a well-formed XML document: this means it must have an xml declara
 at the top and one and only one root element. Many files with the .xml
 extension on my hard drive do not satisfy this.
 
+`ctester.c` does not work with entities that contain double quotes in the
+content. They are written by libxml's `xmlTextWriterWriteDTDEntity` with double
+quotes regardless. Should follow this up with libxml, see if it's a bug at
+their end.
 

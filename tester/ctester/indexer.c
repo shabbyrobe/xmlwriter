@@ -12,6 +12,11 @@
 #define sqlite3_bind_text_name(S, N, V) (sqlite3_bind_text((S), sqlite3_bind_parameter_index((S), (N)), (V), -1, NULL))
 #define sqlite3_bind_int_name(S, N, V)  (sqlite3_bind_int ((S), sqlite3_bind_parameter_index((S), (N)), (V)))
 
+// TODO: this is kinda useless without iconv now that we know expat
+// is pretty unfriendly to encodings outside of the well known
+// ones and the tester forces everything to utf-8 - we might as
+// well convert here too before we index.
+
 magic_t magic;
 
 void usage() {
@@ -597,6 +602,11 @@ int main(int argc, char *argv[]) {
     }
 
 cleanup:
+    if (rc != 0) {
+        // TODO: string errors
+        fprintf(stderr, "Indexing failed with code %d\n", rc);
+    }
+
     magic_close(magic);
 
     if (rc == ERR_USAGE) {

@@ -116,6 +116,7 @@ void ctx_deinit(struct ctx *ctx) {
         ctx->error_free(ctx->error);
     }
     free(ctx->stack);
+    free(ctx->attrs);
 }
 
 bool str_has_prefix(const char *str, const char *pre)
@@ -177,6 +178,8 @@ void xml_default(void *user_data, const expat_ch *s, int len) {
     // expat seems to deserialise entities in discrete chunks, i.e.  not as
     // part of the character data stream. so we can (hopefully) assume that the
     // default handler gets them complete as a single unit.
+    // FIXME: it doesn't apear to do this inside entities, i.e.
+    //   <!ENTITY pathpart "([\w_@.&#x25;*?+-]|\\ )">
     if (ctx->ent_num_mode != ENT_NUM_LEAVE && len > 4 && s[0] == '&' && s[1] == '#' && s[len-1] == ';') {
         int base = 10;
         const char *start = s + 2;
@@ -287,7 +290,6 @@ cleanup:
     }
 
     ctx_deinit(&ctx);
-    free(ctx.attrs);
     XML_ParserFree(parser);
     xmlFreeTextWriter(writer);
 
