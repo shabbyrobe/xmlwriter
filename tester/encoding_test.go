@@ -16,6 +16,7 @@ import (
 	tt "github.com/shabbyrobe/xmlwriter/testtool"
 	"golang.org/x/text/encoding"
 	"golang.org/x/text/encoding/charmap"
+	"golang.org/x/text/encoding/unicode"
 )
 
 func TestEncodingWindows1252(t *testing.T) {
@@ -33,6 +34,22 @@ func TestEncodingWindows1252(t *testing.T) {
 	// attempting to decode as string yields panic
 	check := []byte{'R', 0xE9, 's', 'u', 'm', 0xE9, '&', '#', '1', '2', '8', '5', '1', '2', ';'}
 	tt.Assert(t, bytes.Contains(out, check))
+}
+
+func TestEncodingUTF16BE(t *testing.T) {
+	b := &bytes.Buffer{}
+	enc := unicode.UTF16(unicode.BigEndian, unicode.ExpectBOM).NewEncoder()
+	w := xw.OpenEncoding(b, "utf-16be", enc)
+	xw.Must(w.Start(xw.Doc{}))
+	xw.Must(w.Start(xw.Elem{Name: "hello"}))
+	xw.Must(w.Write(xw.Text("Résumé")))
+	xw.Must(w.Write(xw.Text("😀")))
+	xw.Must(w.EndAllFlush())
+	out := b.Bytes()
+
+	tt.Assert(t, bytes.HasPrefix(out, []byte{0xFE, 0xFF}))
+	tt.Assert(t, bytes.Contains(out, []byte{0xD8, 0x3D, 0xDE, 0x00}))
+	tt.Assert(t, bytes.Contains(out, []byte{0x00, 0x3C, 0x00, 0x68, 0x00, 0x65, 0x00, 0x6C, 0x00, 0x6C, 0x00, 0x6F}))
 }
 
 func TestEncodeRunesInISO88591(t *testing.T) {
