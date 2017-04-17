@@ -11,10 +11,12 @@ It offers some advantages over Go's default encoding/xml package and some
 tradeoffs. You can have complete control of the generated documents and it uses
 very little memory.
 
-There are two styles for interacting with the writer: readable and heap-friendly.
-If you don't care about a few heap escapes (and most of the time you won't), you
-can use the more readable API. If you are writing a code generator or your
-interactions with the API are minimal, you should use the direct API.
+There are two styles for interacting with the writer: structured and heap-friendly.
+If you want a visual representation of the hierarchy of some of your writes in
+your code and you don't care about a few instances of memory escaping to the
+heap (and most of the time you won't), you can use the structured API. If you
+are writing a code generator or your interactions with the API are minimal, you
+should use the direct API.
 
 
 Creating
@@ -27,7 +29,7 @@ xmlwriter.Writer{} takes any io.Writer, along with a variable list of options.
 xmlwriter options are based on Dave Cheney's functional options pattern
 (https://dave.cheney.net/2014/10/17/functional-options-for-friendly-apis):
 
-	w := xmlwriter.NewWriter(b, xmlwriter.WitnIndent())
+	w := xmlwriter.NewWriter(b, xmlwriter.WithIndent())
 
 Provided options are:
   - WithIndent()
@@ -36,9 +38,10 @@ Provided options are:
 
 Overview
 
-Using the more human-friendly API, you might express a small tree of elements
-like this. These nodes will escape to the heap like crazy, but judicious use
-of this nesting can make code a lot more readable:
+Using the structured API, you might express a small tree of elements like this.
+These nodes will escape to the heap, but judicious use of this nesting can make
+certain structures a lot more readable by representing the desired XML
+hierarchy in the code that produces it:
 
 	ec := &xmlwriter.ErrCollector{}
 	defer ec.Panic()
@@ -68,10 +71,9 @@ of this nesting can make code a lot more readable:
 The code can be made even less dense by importing xmlwriter with a prefix:
 `import xw "github.com/shabbyrobe/xmlwriter"`
 
-Using the more Heap-friendy API to produce the same output. This has a lot more
-stutter and a lot worse signal to noise ratio, and it's harder to tell the
-hierarchical relationship just by looking at the code, but there are no heap
-escapes this way:
+The same output is possible with the heap-friendy API. This has a lot more
+stutter and it's harder to tell the hierarchical relationship just by looking
+at the code, but there are no heap escapes this way:
 
 	ec := &xmlwriter.ErrCollector{}
 	defer ec.Panic()
@@ -119,7 +121,7 @@ them to the stack and opens them, allowing children to be added.
 Becomes: <foo><bar><baz/></bar></foo>
 
 Nodes which have no children, or nodes which can be opened and fully closed
-with only a trivial amount of informatin, can be passed to `Writer.Write()`.
+with only a trivial amount of information, can be passed to `Writer.Write()`.
 If written nodes are put on to the stack, they will be popped before Write
 returns.
 
@@ -155,8 +157,8 @@ There are several ways to end an element. Choose the End that's right for you!
 	- EndToDepth(int, NodeKind, name...)
 	- EndDoc()
 	- End...()
-		Where ... is the name of a startable node struct, ends that node kind.
-		Equivalent to
+		Where ... is the name of a startable node struct, End ends that node kind.
+		The following two are equivalent: EndElem() End(ElemNode)
 
 
 Nodes
@@ -165,10 +167,9 @@ Nodes as they are written can be in three states: StateOpen, StateOpened or
 StateEnd. StateOpen == "<elem". StateOpened == "<elem>". StateEnd ==
 "<elem></elem>".
 
-The following Node structs are available for writing in the following
-hierarchy. Nodes which are "Startable" (passed to `writer.Start(n)`) are marked
-with an S. Nodes which are "Writable" (passed to `writer.Write(n)`) are marked
-with a W.
+Node structs are available for writing in the following hierarchy. Nodes which
+are "Startable" (passed to `writer.Start(n)`) are marked with an S. Nodes which
+are "Writable" (passed to `writer.Write(n)`) are marked with a W.
 
 - xmlwriter.Raw* (W)
 - xmlwriter.Doc (S)
@@ -195,7 +196,7 @@ the "open" state but not in the "opened" state, for example you have started
 an element and written an attribute, writing "raw" will add the content to
 the inside of the element opening tag unless you call `w.Next()`.
 
-Every node has a corresponding NodeKind integer, which can be found by
+Every node has a corresponding NodeKind constant, which can be found by
 affixing "Node" to the struct name, i.e. "xmlwriter.Elem" becomes
 "xmlwriter.ElemNode". These are used for calls to Writer.End().
 
