@@ -292,7 +292,7 @@ func (w *Writer) EndAll() error {
 	return nil
 }
 
-// EndToDepth  ends all nodes in the stack up to the supplied depth. The last
+// EndToDepth ends all nodes in the stack up to the supplied depth. The last
 // node must match NodeKind and, if provided and applicable for the node type,
 // the name. This is useful if you want to ensure that everything you open inside
 // a particular scope is closed at the end:

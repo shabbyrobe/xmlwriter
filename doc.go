@@ -1,5 +1,6 @@
 /*
-xmlwriter provides a fast, non-cached, forward-only way to generate XML data.
+Package xmlwriter provides a fast, non-cached, forward-only way to generate XML
+data.
 
 The API is based heavily on libxml's xmlwriter API [1], which is itself
 based on C#'s XmlWriter [2].

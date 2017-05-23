@@ -11,7 +11,7 @@ import (
 	"testing"
 )
 
-// assert fails the test if the condition is false.
+// Assert fails the test if the condition is false.
 func Assert(tb testing.TB, condition bool, v ...interface{}) {
 	if !condition {
 		_, file, line, _ := runtime.Caller(1)
@@ -24,7 +24,8 @@ func Assert(tb testing.TB, condition bool, v ...interface{}) {
 	}
 }
 
-// assert fails the test if the condition is false.
+// Pattern fails the test if the input string does not match the supplied
+// regular expression.
 func Pattern(tb testing.TB, pattern string, in string) {
 	ptn, _ := regexp.Compile(pattern)
 	if !ptn.MatchString(in) {
@@ -35,7 +36,8 @@ func Pattern(tb testing.TB, pattern string, in string) {
 	}
 }
 
-// assert equals for floats with user supplied epsilon
+// FloatNear ensures floats which may not strictly compare equal fall inside a
+// user supplied epsilon.
 func FloatNear(tb testing.TB, epsilon float64, expected float64, actual float64, v ...interface{}) {
 	diff := expected - actual
 	near := diff == 0 || (diff < 0 && diff > -epsilon) || (diff > 0 && diff < epsilon)
@@ -50,7 +52,7 @@ func FloatNear(tb testing.TB, epsilon float64, expected float64, actual float64,
 	}
 }
 
-// ok fails the test if an err is not nil.
+// OK fails the test if an err is not nil.
 func OK(tb testing.TB, err error) {
 	if err != nil {
 		_, file, line, _ := runtime.Caller(1)
@@ -59,7 +61,7 @@ func OK(tb testing.TB, err error) {
 	}
 }
 
-// equals fails the test if exp is not equal to act.
+// Equals fails the test if exp is not equal to act.
 func Equals(tb testing.TB, exp, act interface{}) {
 	if !reflect.DeepEqual(exp, act) {
 		_, file, line, _ := runtime.Caller(1)
