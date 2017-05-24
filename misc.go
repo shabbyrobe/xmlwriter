@@ -2,13 +2,9 @@ package xmlwriter
 
 import "fmt"
 
-// Deprecated: Use ErrCollector instead
-func Must(err error) {
-	if err != nil {
-		panic(err)
-	}
-}
-
+// Event is raised when a node changes state in the writer. It is currently
+// only relevant to the Indenter but may become an event system in a later
+// version.
 type Event struct {
 	State    NodeState
 	Node     NodeKind

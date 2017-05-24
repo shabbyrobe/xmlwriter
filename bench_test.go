@@ -5,27 +5,33 @@ import (
 	"testing"
 )
 
+func must(err error) {
+	if err != nil {
+		panic(err)
+	}
+}
+
 func BenchmarkWriterGeneral(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		w := Open(Null{})
 
-		Must(w.StartDoc(Doc{}))
-		Must(w.StartElem(Elem{Name: "foo"}))
-		Must(w.StartElem(Elem{Name: "bar"}))
-		Must(w.WriteAttr(Attr{Name: "a"}.Bool(true)))
-		Must(w.StartElem(Elem{Name: "baz"}))
-		Must(w.WriteElem(Elem{Name: "test", Attrs: []Attr{{Name: "foo"}}}))
-		Must(w.WriteElem(Elem{Name: "test"}))
-		Must(w.WriteElem(Elem{Name: "test"}))
-		Must(w.WriteElem(Elem{Name: "test"}))
-		Must(w.WriteElem(Elem{Name: "test"}))
-		Must(w.StartComment(Comment{}))
-		Must(w.WriteCommentContent("this is  a comment"))
-		Must(w.WriteCommentContent("this is  a comment"))
-		Must(w.EndComment())
-		Must(w.WriteCData(CData{"pants pants revolution"}))
-		Must(w.EndElemFull("baz"))
-		Must(w.EndDoc())
+		must(w.StartDoc(Doc{}))
+		must(w.StartElem(Elem{Name: "foo"}))
+		must(w.StartElem(Elem{Name: "bar"}))
+		must(w.WriteAttr(Attr{Name: "a"}.Bool(true)))
+		must(w.StartElem(Elem{Name: "baz"}))
+		must(w.WriteElem(Elem{Name: "test", Attrs: []Attr{{Name: "foo"}}}))
+		must(w.WriteElem(Elem{Name: "test"}))
+		must(w.WriteElem(Elem{Name: "test"}))
+		must(w.WriteElem(Elem{Name: "test"}))
+		must(w.WriteElem(Elem{Name: "test"}))
+		must(w.StartComment(Comment{}))
+		must(w.WriteCommentContent("this is  a comment"))
+		must(w.WriteCommentContent("this is  a comment"))
+		must(w.EndComment())
+		must(w.WriteCData(CData{"pants pants revolution"}))
+		must(w.EndElemFull("baz"))
+		must(w.EndDoc())
 		w.Flush()
 	}
 }
@@ -65,14 +71,14 @@ func benchmarkWriter(b *testing.B, cnt int) {
 	for i := 0; i < b.N; i++ {
 		w := Open(Null{})
 
-		Must(w.StartDoc(Doc{}))
-		Must(w.StartElem(Elem{Name: o.Name}))
+		must(w.StartDoc(Doc{}))
+		must(w.StartElem(Elem{Name: o.Name}))
 		for _, c := range o.Inners {
-			Must(w.StartElem(Elem{Name: "inner"}))
-			Must(w.WriteAttr(Attr{Name: "name", Value: c.Name}, Attr{Name: "value", Value: c.Value}))
-			Must(w.End(ElemNode))
+			must(w.StartElem(Elem{Name: "inner"}))
+			must(w.WriteAttr(Attr{Name: "name", Value: c.Name}, Attr{Name: "value", Value: c.Value}))
+			must(w.End(ElemNode))
 		}
-		Must(w.EndAllFlush())
+		must(w.EndAllFlush())
 	}
 }
 
@@ -81,7 +87,7 @@ func benchmarkGolang(b *testing.B, cnt int) {
 	o := makeStruct(cnt)
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
-		Must(xml.NewEncoder(Null{}).Encode(o))
+		must(xml.NewEncoder(Null{}).Encode(o))
 	}
 }
 

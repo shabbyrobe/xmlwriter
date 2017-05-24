@@ -17,10 +17,10 @@ func TestIndentElemAttr(t *testing.T) {
 		"</a>",
 	}, "\n")
 	b, w := open(WithIndent())
-	Must(w.Start(Elem{Name: "a"}))
-	Must(w.Start(Elem{Name: "b", Attrs: []Attr{{Name: "foo", Value: "bar"}}}))
-	Must(w.Write(Elem{Name: "c"}, Elem{Name: "c"}))
-	Must(w.EndAll())
+	must(w.Start(Elem{Name: "a"}))
+	must(w.Start(Elem{Name: "b", Attrs: []Attr{{Name: "foo", Value: "bar"}}}))
+	must(w.Write(Elem{Name: "c"}, Elem{Name: "c"}))
+	must(w.EndAll())
 	tt.Equals(t, result, str(b, w))
 }
 
@@ -34,7 +34,7 @@ func TestIndentElemTextComplex(t *testing.T) {
 		"</a>",
 	}, "\n")
 	b, w := open(WithIndent())
-	mustAll(
+	(&ErrCollector{}).Must(
 		w.Start(Elem{Name: "a"}, Elem{Name: "b"}),
 		w.Write(Text("Hi my name is "), Elem{Name: "judge"}, Text(". Judge ")),
 		w.Start(Elem{Name: "my"}, Elem{Name: "name"}),
@@ -53,9 +53,9 @@ func TestIndentEmptyInlineBetweenText(t *testing.T) {
 		"</a>",
 	}, "\n")
 	b, w := open(WithIndent())
-	Must(w.Start(Elem{Name: "a"}, Elem{Name: "b"}))
-	Must(w.Write(Text("Hi my name is "), Elem{Name: "judge"}, Text(".")))
-	Must(w.EndAll())
+	must(w.Start(Elem{Name: "a"}, Elem{Name: "b"}))
+	must(w.Write(Text("Hi my name is "), Elem{Name: "judge"}, Text(".")))
+	must(w.EndAll())
 	tt.Equals(t, result, str(b, w))
 }
 
@@ -66,9 +66,9 @@ func TestIndentEmptyInlineAfterText(t *testing.T) {
 		"</a>",
 	}, "\n")
 	b, w := open(WithIndent())
-	Must(w.Start(Elem{Name: "a"}, Elem{Name: "b"}))
-	Must(w.Write(Text("Hi my name is "), Elem{Name: "judge"}))
-	Must(w.EndAll())
+	must(w.Start(Elem{Name: "a"}, Elem{Name: "b"}))
+	must(w.Write(Text("Hi my name is "), Elem{Name: "judge"}))
+	must(w.EndAll())
 	tt.Equals(t, result, str(b, w))
 }
 
@@ -80,7 +80,7 @@ func TestIndentDoc(t *testing.T) {
 		"</a>",
 	}, "\n") + "\n"
 	b, w := open(WithIndent())
-	Must(w.Block(Doc{},
+	must(w.Block(Doc{},
 		Elem{Name: "a", Content: []Writable{Elem{Name: "b"}}},
 	))
 	tt.Equals(t, result, str(b, w))
@@ -101,19 +101,19 @@ func TestIndentDTD(t *testing.T) {
 		`<foo/>`,
 	}, "\n") + "\n"
 	b, w := open(WithIndent())
-	Must(w.Start(Doc{}, DTD{Name: "pants"}))
-	Must(w.Write(
+	must(w.Start(Doc{}, DTD{Name: "pants"}))
+	must(w.Write(
 		Notation{Name: "yep", SystemID: "sys"},
-		DTDElem{Name: "foo", Decl: DTDEmpty},
+		DTDElem{Name: "foo", Decl: DTDElemEmpty},
 		DTDEntity{Name: "hi", Content: "yep"},
 		DTDAttList{Name: "att", Attrs: []DTDAttr{
-			{Name: "foo", Type: DTDCData},
-			{Name: "bar", Type: DTDCData},
+			{Name: "foo", Type: DTDAttrString},
+			{Name: "bar", Type: DTDAttrString},
 		}},
 	))
-	Must(w.End(DTDNode))
-	Must(w.Write(Elem{Name: "foo"}))
-	Must(w.EndAll())
+	must(w.End(DTDNode))
+	must(w.Write(Elem{Name: "foo"}))
+	must(w.EndAll())
 	tt.Equals(t, result, str(b, w))
 }
 
@@ -127,11 +127,11 @@ func TestIndentComment(t *testing.T) {
 		`</a>`,
 	}, "\n") + "\n"
 	b, w := open(WithIndent())
-	Must(w.Start(Doc{}))
-	Must(w.Start(Elem{Name: "a"}))
-	Must(w.Start(Elem{Name: "b"}))
-	Must(w.Start(Comment{Content: "hi how are you"}))
-	Must(w.EndAll())
+	must(w.Start(Doc{}))
+	must(w.Start(Elem{Name: "a"}))
+	must(w.Start(Elem{Name: "b"}))
+	must(w.Start(Comment{Content: "hi how are you"}))
+	must(w.EndAll())
 
 	tt.Equals(t, result, str(b, w))
 }
@@ -144,11 +144,11 @@ func TestIndentCData(t *testing.T) {
 		`</a>`,
 	}, "\n") + "\n"
 	b, w := open(WithIndent())
-	Must(w.Start(Doc{}))
-	Must(w.Start(Elem{Name: "a"}))
-	Must(w.Start(Elem{Name: "b"}))
-	Must(w.Start(CData{Content: "hi how are you"}))
-	Must(w.EndAll())
+	must(w.Start(Doc{}))
+	must(w.Start(Elem{Name: "a"}))
+	must(w.Start(Elem{Name: "b"}))
+	must(w.Start(CData{Content: "hi how are you"}))
+	must(w.EndAll())
 
 	tt.Equals(t, result, str(b, w))
 }
@@ -161,7 +161,7 @@ func TestIndentRaw(t *testing.T) {
 	b, w := open(WithIndent())
 
 	// TODO: more permutations of elements
-	mustAll(
+	(&ErrCollector{}).Must(
 		w.Start(Doc{}),
 		w.Write(Raw("wat")),
 		w.Start(Elem{Name: "a"}),

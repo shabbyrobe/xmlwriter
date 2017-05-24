@@ -2,6 +2,7 @@ package xmlwriter
 
 import "fmt"
 
+// Elem represents an XML element to be written by the writer.
 type Elem struct {
 	Prefix string
 	URI    string

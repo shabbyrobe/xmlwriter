@@ -19,14 +19,6 @@ func allocs() uint64 {
 	return memstats.Mallocs
 }
 
-func mustAll(err ...error) {
-	for i, e := range err {
-		if e != nil {
-			panic(fmt.Errorf("failed on index %d with error %v", i, e))
-		}
-	}
-}
-
 type Null struct{}
 
 func (w Null) Write(p []byte) (n int, err error) {
@@ -56,14 +48,14 @@ func openNull(o ...Option) *Writer {
 }
 
 func str(b *bytes.Buffer, w *Writer) string {
-	Must(w.Flush())
+	must(w.Flush())
 	return b.String()
 }
 
 func doWrite(node ...Writable) string {
 	b, w := open()
 	for _, n := range node {
-		Must(w.Write(n))
+		must(w.Write(n))
 	}
 	return str(b, w)
 }
@@ -71,14 +63,14 @@ func doWrite(node ...Writable) string {
 func doStart(node ...Startable) string {
 	b, w := open()
 	for _, n := range node {
-		Must(w.Start(n))
+		must(w.Start(n))
 	}
 	return str(b, w)
 }
 
 func doBlock(start Startable, children ...Writable) string {
 	b, w := open()
-	Must(w.Block(start, children...))
+	must(w.Block(start, children...))
 	return str(b, w)
 }
 
@@ -114,9 +106,9 @@ func doBlockErrMsg(start Startable, children ...Writable) (ret string) {
 
 func TestDoc(t *testing.T) {
 	b, w := open()
-	Must(w.Start(Doc{}))
+	must(w.Start(Doc{}))
 	tt.Equals(t, "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n", str(b, w))
-	Must(w.EndDoc())
+	must(w.EndDoc())
 	tt.Equals(t, "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n", str(b, w))
 }
 
@@ -132,113 +124,132 @@ func TestElemSingle(t *testing.T) {
 }
 
 func TestElemEndNamed(t *testing.T) {
+	ec := &ErrCollector{}
 	b, w := open()
-	Must(w.Start(Elem{Name: "yep"}))
+
+	ec.Must(w.Start(Elem{Name: "yep"}))
 	tt.Equals(t, "<yep", str(b, w))
-	Must(w.End(ElemNode, "yep"))
+
+	ec.Must(w.End(ElemNode, "yep"))
 	tt.Equals(t, "<yep/>", str(b, w))
 }
 
 func TestElemPushMultiple(t *testing.T) {
+	ec := &ErrCollector{}
 	b, w := open()
-	Must(w.Start(Elem{Name: "yep"}))
-	Must(w.Start(Elem{Name: "yep"}))
-	Must(w.EndElemFull())
-	Must(w.EndElemFull())
+
+	ec.Must(w.Start(Elem{Name: "yep"}))
+	ec.Must(w.Start(Elem{Name: "yep"}))
+	ec.Must(w.EndElemFull())
+	ec.Must(w.EndElemFull())
 	tt.Equals(t, "<yep><yep></yep></yep>", str(b, w))
 }
 
 func TestElemPushMultiplePrefixed(t *testing.T) {
+	ec := &ErrCollector{}
 	b, w := open()
-	Must(w.Start(Elem{Name: "yep", Prefix: "woo"}))
-	Must(w.Start(Elem{Name: "yep", Prefix: "woo"}))
-	Must(w.EndElemFull())
-	Must(w.EndElemFull())
+	ec.Must(w.Start(Elem{Name: "yep", Prefix: "woo"}))
+	ec.Must(w.Start(Elem{Name: "yep", Prefix: "woo"}))
+	ec.Must(w.EndElemFull())
+	ec.Must(w.EndElemFull())
 	tt.Equals(t, "<woo:yep><woo:yep></woo:yep></woo:yep>", str(b, w))
 }
 
 func TestElemSingleAttrOption(t *testing.T) {
+	ec := &ErrCollector{}
 	b, w := open()
-	Must(w.Start(Elem{Name: "yep", Attrs: []Attr{
+	ec.Must(w.Start(Elem{Name: "yep", Attrs: []Attr{
 		{Name: "one", Value: "1"},
 		{Name: "two", Value: "2"},
 	}}))
 	tt.Equals(t, "<yep one=\"1\" two=\"2\"", str(b, w))
-	Must(w.EndElem())
+	ec.Must(w.EndElem())
 	tt.Equals(t, "<yep one=\"1\" two=\"2\"/>", str(b, w))
 }
 
 func TestElemSingleFullOption(t *testing.T) {
+	ec := &ErrCollector{}
 	b, w := open()
-	Must(w.Start(Elem{Name: "yep", Full: true}))
+	ec.Must(w.Start(Elem{Name: "yep", Full: true}))
 	tt.Equals(t, "<yep", str(b, w))
-	Must(w.EndElem())
+	ec.Must(w.EndElem())
 	tt.Equals(t, "<yep></yep>", str(b, w))
 }
 
 func TestElemSingleAttrOptionFullOption(t *testing.T) {
+	ec := &ErrCollector{}
 	b, w := open()
-	Must(w.Start(Elem{Name: "yep", Full: true, Attrs: []Attr{
+	ec.Must(w.Start(Elem{Name: "yep", Full: true, Attrs: []Attr{
 		{Name: "one", Value: "1"},
 		{Name: "two", Value: "2"},
 	}}))
 	tt.Equals(t, "<yep one=\"1\" two=\"2\"", str(b, w))
-	Must(w.EndElem())
+	ec.Must(w.EndElem())
 	tt.Equals(t, "<yep one=\"1\" two=\"2\"></yep>", str(b, w))
 }
 
 func TestElemSingleFullMethod(t *testing.T) {
+	ec := &ErrCollector{}
 	b, w := open()
-	Must(w.Start(Elem{Name: "yep", Full: false}))
+	ec.Must(w.Start(Elem{Name: "yep", Full: false}))
 	tt.Equals(t, "<yep", str(b, w))
-	Must(w.EndElemFull())
+	ec.Must(w.EndElemFull())
 	tt.Equals(t, "<yep></yep>", str(b, w))
 }
 
 func TestElemAttrDuplicatesElemPrefix(t *testing.T) {
+	ec := &ErrCollector{}
 	b, w := open()
-	Must(w.Start(Elem{Name: "yep", Prefix: "ns1", URI: "http://uri"}))
-	Must(w.Write(Attr{Name: "yep", Value: "bar", Prefix: "ns1", URI: "http://uri"}))
-	Must(w.EndElemFull())
+	ec.Must(w.Start(Elem{Name: "yep", Prefix: "ns1", URI: "http://uri"}))
+	ec.Must(w.Write(Attr{Name: "yep", Value: "bar", Prefix: "ns1", URI: "http://uri"}))
+	ec.Must(w.EndElemFull())
 	tt.Equals(t, `<ns1:yep xmlns:ns1="http://uri" ns1:yep="bar"></ns1:yep>`, str(b, w))
 }
 
 func TestElemWriteTree(t *testing.T) {
+	ec := &ErrCollector{}
 	b, w := open()
-	Must(w.Write(Elem{Name: "foo", Content: []Writable{
-		Elem{Name: "bar"},
-		Elem{Name: "baz", Content: []Writable{
-			Elem{Name: "qux"},
-		}},
-	}}))
-	tt.Equals(t, "<foo><bar/><baz><qux/></baz></foo>", str(b, w))
+	ec.Must(w.Write(Elem{
+		Name:  "foo",
+		Attrs: []Attr{Attr{Name: "a", Value: "b"}},
+		Content: []Writable{
+			Elem{Name: "bar"},
+			Elem{Name: "baz", Content: []Writable{
+				Elem{Name: "qux"},
+			}},
+		},
+	}))
+	tt.Equals(t, `<foo a="b"><bar/><baz><qux/></baz></foo>`, str(b, w))
 }
 
 func TestElemStartTree(t *testing.T) {
+	ec := &ErrCollector{}
 	b, w := open()
-	Must(w.Start(Elem{Name: "foo", Content: []Writable{
+	ec.Must(w.Start(Elem{Name: "foo", Content: []Writable{
 		Elem{Name: "bar"},
 		Elem{Name: "baz", Content: []Writable{
 			Elem{Name: "qux"},
 		}},
 	}}))
-	Must(w.Write(Elem{Name: "pants"}))
-	Must(w.EndAll())
+	ec.Must(w.Write(Elem{Name: "pants"}))
+	ec.Must(w.EndAll())
 
 	tt.Equals(t, "<foo><bar/><baz><qux/></baz><pants/></foo>", str(b, w))
 }
 
 func TestWriteAttrBare(t *testing.T) {
+	ec := &ErrCollector{}
 	b, w := open()
-	Must(w.Write(Attr{Name: "foo"}))
-	Must(w.Write(Attr{Name: "bar"}))
+	ec.Must(w.Write(Attr{Name: "foo"}))
+	ec.Must(w.Write(Attr{Name: "bar"}))
 	tt.Equals(t, ` foo="" bar=""`, str(b, w))
 }
 
 func TestWriteAttrInts(t *testing.T) {
+	ec := &ErrCollector{}
 	b, w := open()
-	Must(w.Start(Elem{Name: "foo"}))
-	Must(w.Write(
+	ec.Must(w.Start(Elem{Name: "foo"}))
+	ec.Must(w.Write(
 		Attr{Name: "int"}.Int(10),
 		Attr{Name: "intneg"}.Int(-10),
 		Attr{Name: "int8"}.Int8(20),
@@ -251,96 +262,106 @@ func TestWriteAttrInts(t *testing.T) {
 		Attr{Name: "uint32"}.Uint32(40),
 		Attr{Name: "uint64"}.Uint64(50),
 	))
-	Must(w.EndAll())
+	ec.Must(w.EndAll())
 
 	tt.Equals(t, `<foo int="10" intneg="-10" int8="20" int16="30" int32="40" int64="50"`+
 		` uint="10" uint8="20" uint16="30" uint32="40" uint64="50"/>`, str(b, w))
 }
 
 func TestWriteAttrBool(t *testing.T) {
+	ec := &ErrCollector{}
 	b, w := open()
-	Must(w.Start(Elem{Name: "foo"}))
-	Must(w.Write(
+	ec.Must(w.Start(Elem{Name: "foo"}))
+	ec.Must(w.Write(
 		Attr{Name: "yep"}.Bool(true),
 		Attr{Name: "nup"}.Bool(false),
 	))
-	Must(w.EndAll())
+	ec.Must(w.EndAll())
 
 	tt.Equals(t, `<foo yep="true" nup="false"/>`, str(b, w))
 }
 
 func TestWriteAttrFloats(t *testing.T) {
+	ec := &ErrCollector{}
 	b, w := open()
-	Must(w.Start(Elem{Name: "foo"}))
-	Must(w.Write(
+	ec.Must(w.Start(Elem{Name: "foo"}))
+	ec.Must(w.Write(
 		Attr{Name: "float32"}.Float32(123.45),
 		Attr{Name: "float64"}.Float64(234.56),
 	))
-	Must(w.EndAll())
+	ec.Must(w.EndAll())
 
 	tt.Equals(t, `<foo float32="123.45" float64="234.56"/>`, str(b, w))
 }
 
 func TestWriteAttrPrefix(t *testing.T) {
+	ec := &ErrCollector{}
 	b, w := open()
-	Must(w.Write(Attr{Name: "foo", Prefix: "yep"}))
-	Must(w.Write(Attr{Name: "bar", Prefix: "nup"}))
+	ec.Must(w.Write(Attr{Name: "foo", Prefix: "yep"}))
+	ec.Must(w.Write(Attr{Name: "bar", Prefix: "nup"}))
 	tt.Equals(t, ` yep:foo="" nup:bar=""`, str(b, w))
 }
 
 func TestWriteElemAttrPrefix(t *testing.T) {
+	ec := &ErrCollector{}
 	b, w := open()
-	Must(w.Start(Elem{Name: "elem"}))
-	Must(w.Write(Attr{Name: "foo", Prefix: "yep"}))
-	Must(w.Write(Attr{Name: "bar", Prefix: "nup"}))
-	Must(w.EndElem())
+	ec.Must(w.Start(Elem{Name: "elem"}))
+	ec.Must(w.Write(Attr{Name: "foo", Prefix: "yep"}))
+	ec.Must(w.Write(Attr{Name: "bar", Prefix: "nup"}))
+	ec.Must(w.EndElem())
 	tt.Equals(t, `<elem yep:foo="" nup:bar=""/>`, str(b, w))
 }
 
 func TestWriteElemAttrPrefixURI(t *testing.T) {
+	ec := &ErrCollector{}
 	b, w := open()
-	Must(w.Start(Elem{Name: "elem"}))
-	Must(w.Write(Attr{Name: "foo", Prefix: "yep", URI: "http://esta"}))
-	Must(w.Write(Attr{Name: "bar", Prefix: "nup", URI: "http://otre"}))
-	Must(w.EndElem())
+	ec.Must(w.Start(Elem{Name: "elem"}))
+	ec.Must(w.Write(Attr{Name: "foo", Prefix: "yep", URI: "http://esta"}))
+	ec.Must(w.Write(Attr{Name: "bar", Prefix: "nup", URI: "http://otre"}))
+	ec.Must(w.EndElem())
 	tt.Equals(t, `<elem yep:foo="" nup:bar="" xmlns:yep="http://esta" xmlns:nup="http://otre"/>`, str(b, w))
 }
 
 func TestWriteElemAttrDuplicatePrefixDifferentURI(t *testing.T) {
+	ec := &ErrCollector{}
+
 	// FIXME: this should not succeed
 	_, w := open()
-	Must(w.Start(Elem{Name: "elem"}))
-	Must(w.Write(Attr{Name: "foo", Prefix: "yep", URI: "http://esta"}))
+	ec.Must(w.Start(Elem{Name: "elem"}))
+	ec.Must(w.Write(Attr{Name: "foo", Prefix: "yep", URI: "http://esta"}))
 
 	err := w.Write(Attr{Name: "bar", Prefix: "yep", URI: "http://otre"})
 	tt.Assert(t, err.Error() == "uri already exists for ns prefix yep")
 }
 
 func TestWriteBadAttr(t *testing.T) {
+	ec := &ErrCollector{}
+
 	w := openNull()
-	Must(w.Start(Doc{}))
+	ec.Must(w.Start(Doc{}))
 	tt.Equals(t,
 		fmt.Errorf("xmlwriter: unexpected kind document, expected none, elem"),
 		w.Write(Attr{Name: "yep"}))
 
 	w = openNull()
-	Must(w.Start(DTD{Name: "dtd"}))
+	ec.Must(w.Start(DTD{Name: "dtd"}))
 	tt.Equals(t,
 		fmt.Errorf("xmlwriter: unexpected kind dtd, expected none, elem"),
 		w.Write(Attr{Name: "yep"}))
 }
 
 func TestNest(t *testing.T) {
+	ec := &ErrCollector{}
 	b, w := open()
 	expected := &bytes.Buffer{}
 	for i := 0; i < 1000; i++ {
-		Must(w.Start(Elem{Name: "hi", Full: true}))
+		ec.Must(w.Start(Elem{Name: "hi", Full: true}))
 		expected.WriteString("<hi>")
 	}
 	for i := 0; i < 1000; i++ {
 		expected.WriteString("</hi>")
 	}
-	Must(w.EndAll())
+	ec.Must(w.EndAll())
 	tt.Equals(t, expected.String(), str(b, w))
 }
 
@@ -371,77 +392,81 @@ func TestPI(t *testing.T) {
 }
 
 func TestEndToDepth(t *testing.T) {
+	ec := &ErrCollector{}
 	b, w := open()
-	Must(w.Start(Elem{Name: "foo"}))
+	ec.Must(w.Start(Elem{Name: "foo"}))
 
 	d := w.Depth()
-	Must(w.Start(Elem{Name: "bar"}))
-	Must(w.Start(Elem{Name: "baz"}))
-	Must(w.Start(Elem{Name: "qux"}))
-	Must(w.EndToDepth(d, ElemNode, "bar"))
+	ec.Must(w.Start(Elem{Name: "bar"}))
+	ec.Must(w.Start(Elem{Name: "baz"}))
+	ec.Must(w.Start(Elem{Name: "qux"}))
+	ec.Must(w.EndToDepth(d, ElemNode, "bar"))
 	tt.Equals(t, `<foo><bar><baz><qux/></baz></bar>`, str(b, w))
 }
 
 func TestEndAny(t *testing.T) {
+	ec := &ErrCollector{}
 	b, w := open()
-	Must(w.Start(Elem{Name: "foo"}))
-	Must(w.Start(Elem{Name: "bar"}))
-	Must(w.Start(Elem{Name: "baz"}))
-	Must(w.EndAny())
-	Must(w.EndAny())
-	Must(w.EndAny())
+	ec.Must(w.Start(Elem{Name: "foo"}))
+	ec.Must(w.Start(Elem{Name: "bar"}))
+	ec.Must(w.Start(Elem{Name: "baz"}))
+	ec.Must(w.EndAny())
+	ec.Must(w.EndAny())
+	ec.Must(w.EndAny())
 	e := w.EndAny()
 	tt.Pattern(t, `could not pop node`, e.Error())
 	tt.Equals(t, `<foo><bar><baz/></bar></foo>`, str(b, w))
 }
 
 func TestEndNamed(t *testing.T) {
+	ec := &ErrCollector{}
 	b, w := open()
-	Must(w.Start(DTD{Name: "foo"}))
-	Must(w.End(DTDNode, "foo"))
+	ec.Must(w.Start(DTD{Name: "foo"}))
+	ec.Must(w.End(DTDNode, "foo"))
 	tt.Equals(t, `<!DOCTYPE foo>`, str(b, w))
 
 	_, w = open()
-	Must(w.Start(DTD{Name: "foo"}))
+	ec.Must(w.Start(DTD{Name: "foo"}))
 	tt.Pattern(t, `dtd name 'foo' did not match expected 'bar'`,
 		w.End(DTDNode, "bar").Error())
 
 	_, w = open()
-	Must(w.Start(DTDAttList{Name: "foo"}))
+	ec.Must(w.Start(DTDAttList{Name: "foo"}))
 	tt.Pattern(t, `dtdattlist name 'foo' did not match expected 'bar'`,
 		w.End(DTDAttListNode, "bar").Error())
 
 	// FIXME: This could be better as an error.
 	_, w = open()
-	Must(w.Start(Elem{Prefix: "yep", Name: "foo"}))
-	Must(w.End(ElemNode, "foo"))
+	ec.Must(w.Start(Elem{Prefix: "yep", Name: "foo"}))
+	ec.Must(w.End(ElemNode, "foo"))
 
 	_, w = open()
-	Must(w.Start(Elem{Prefix: "yep", Name: "foo"}))
-	Must(w.End(ElemNode, "yep", "foo"))
+	ec.Must(w.Start(Elem{Prefix: "yep", Name: "foo"}))
+	ec.Must(w.End(ElemNode, "yep", "foo"))
 
 	_, w = open()
-	Must(w.Start(Elem{Prefix: "yep", Name: "foo"}))
+	ec.Must(w.Start(Elem{Prefix: "yep", Name: "foo"}))
 	tt.Pattern(t, `elem name 'yep:foo' did not match expected 'nup:foo'`,
 		w.End(ElemNode, "nup", "foo").Error())
 
 	_, w = open()
-	Must(w.Start(Elem{Prefix: "yep", Name: "foo"}))
+	ec.Must(w.Start(Elem{Prefix: "yep", Name: "foo"}))
 	tt.Pattern(t, `elem name 'yep:foo' did not match expected 'yep:bar'`,
 		w.End(ElemNode, "yep", "bar").Error())
 
 	_, w = open()
-	Must(w.Start(Comment{}))
+	ec.Must(w.Start(Comment{}))
 	tt.Pattern(t, `node was not named`, w.End(CommentNode, "foo").Error())
 
 	_, w = open()
-	Must(w.Start(Comment{}))
+	ec.Must(w.Start(Comment{}))
 	tt.Pattern(t, `node was not named`, w.End(CommentNode, "foo", "bar").Error())
 }
 
 func TestEndWrong(t *testing.T) {
+	ec := &ErrCollector{}
 	_, w := open()
-	Must(w.Start(Elem{Name: "foo"}))
+	ec.Must(w.Start(Elem{Name: "foo"}))
 	tt.Pattern(t, `unexpected kind elem, expected dtd`, w.End(DTDNode).Error())
 }
 
@@ -479,12 +504,12 @@ func TestReadableAPI(t *testing.T) {
 func TestLast(t *testing.T) {
 	startLast := func(s Startable) Event {
 		_, w := open(WithIndent())
-		Must(w.Start(s))
+		(&ErrCollector{}).Must(w.Start(s))
 		return w.last
 	}
 	writeLast := func(n Writable) Event {
 		_, w := open(WithIndent())
-		Must(w.Write(n))
+		(&ErrCollector{}).Must(w.Write(n))
 		return w.last
 	}
 	tt.Equals(t, Event{StateOpen, ElemNode, 0}, startLast(Elem{Name: "foo"}))
@@ -529,7 +554,7 @@ func TestInvalidParent(t *testing.T) {
 
 func testInvalidParent(t *testing.T, startNode bool, node Node, parent Startable) {
 	_, w := open()
-	Must(w.Start(parent))
+	(&ErrCollector{}).Must(w.Start(parent))
 	var err error
 	if startNode {
 		err = w.Start(node.(Startable))
@@ -690,29 +715,29 @@ func TestDTDAttList(t *testing.T) {
 
 	tt.Equals(t, `<!ATTLIST yep a1 CDATA #IMPLIED a2 CDATA #IMPLIED>`,
 		doWrite(DTDAttList{Name: "yep", Attrs: []DTDAttr{
-			{Name: "a1", Type: "CDATA"},
-			{Name: "a2", Type: "CDATA"},
+			{Name: "a1", Type: DTDAttrString},
+			{Name: "a2", Type: DTDAttrString},
 		}}))
 
 	tt.Equals(t, `<!ATTLIST yep a1 CDATA #REQUIRED a2 CDATA #REQUIRED>`,
 		doWrite(DTDAttList{Name: "yep", Attrs: []DTDAttr{
-			{Name: "a1", Type: "CDATA", Required: true},
-			{Name: "a2", Type: "CDATA", Required: true},
+			{Name: "a1", Type: DTDAttrString, Required: true},
+			{Name: "a2", Type: DTDAttrString, Required: true},
 		}}))
 	tt.Equals(t, `<!ATTLIST yep a1 CDATA #FIXED "foo" a2 CDATA #FIXED "bar">`,
 		doWrite(DTDAttList{Name: "yep", Attrs: []DTDAttr{
-			{Name: "a1", Type: "CDATA", Decl: "foo", Required: true},
-			{Name: "a2", Type: "CDATA", Decl: "bar", Required: true},
+			{Name: "a1", Type: DTDAttrString, Decl: "foo", Required: true},
+			{Name: "a2", Type: DTDAttrString, Decl: "bar", Required: true},
 		}}))
 	tt.Equals(t, `<!ATTLIST yep a1 CDATA "foo" a2 CDATA "bar">`,
 		doWrite(DTDAttList{Name: "yep", Attrs: []DTDAttr{
-			{Name: "a1", Type: "CDATA", Decl: "foo"},
-			{Name: "a2", Type: "CDATA", Decl: "bar"},
+			{Name: "a1", Type: DTDAttrString, Decl: "foo"},
+			{Name: "a2", Type: DTDAttrString, Decl: "bar"},
 		}}))
 
 	tt.Equals(t, `<!ATTLIST yep a1 CDATA "foo" a2 CDATA "bar">`,
-		doBlock(DTDAttList{Name: "yep"}, DTDAttr{Name: "a1", Type: "CDATA", Decl: "foo"},
-			DTDAttr{Name: "a2", Type: "CDATA", Decl: "bar"}))
+		doBlock(DTDAttList{Name: "yep"}, DTDAttr{Name: "a1", Type: DTDAttrString, Decl: "foo"},
+			DTDAttr{Name: "a2", Type: DTDAttrString, Decl: "bar"}))
 
 	tt.Pattern(t, `(?i)name must not be empty`, doWriteErrMsg(DTDAttList{}))
 	tt.Pattern(t, `(?i)invalid name`, doWriteErrMsg(DTDAttList{Name: "1"}))
@@ -720,14 +745,23 @@ func TestDTDAttList(t *testing.T) {
 }
 
 func TestDTDElem(t *testing.T) {
-	tt.Equals(t, `<!ELEMENT elem EMPTY>`, doWrite(DTDElem{Name: "elem", Decl: DTDEmpty}))
+	tt.Equals(t, `<!ELEMENT elem EMPTY>`,
+		doWrite(DTDElem{Name: "elem", Decl: DTDElemEmpty}))
+	tt.Equals(t, `<!ELEMENT elem (#PCDATA|child)*>`,
+		doWrite(DTDElem{Name: "elem", Decl: "(#PCDATA|child)*"}))
+
+	// FIXME: couldn't quite grok this from the spec yet, but it is
+	// an example pasted verbatim of a valid element decl.
+	// tt.Equals(t, `<!ELEMENT %name.para; %content.para;>`,
+	//     doWrite(DTDElem{Name: `%name.para;`, Decl: `%content.para;`}))
+
 	tt.Pattern(t, `(?i)name must not be empty`, doWriteErrMsg(DTDElem{}))
 	tt.Pattern(t, `(?i)decl must not be empty`, doWriteErrMsg(DTDElem{Name: "elem"}))
-	tt.Pattern(t, `(?i)invalid name`, doWriteErrMsg(DTDElem{Name: "@$Q$", Decl: DTDEmpty}))
+	tt.Pattern(t, `(?i)invalid name`, doWriteErrMsg(DTDElem{Name: "@$Q$", Decl: DTDElemEmpty}))
 }
 
 func TestDTDAttr(t *testing.T) {
-	tt.Equals(t, ` foo CDATA #IMPLIED`, doWrite(DTDAttr{Name: "foo", Type: DTDCData}))
+	tt.Equals(t, ` foo CDATA #IMPLIED`, doWrite(DTDAttr{Name: "foo", Type: DTDAttrString}))
 	tt.Equals(t, ` foo CDATA #IMPLIED bar CDATA #IMPLIED`, doWrite(
 		DTDAttr{Name: "foo", Type: "CDATA"},
 		DTDAttr{Name: "bar", Type: "CDATA"}))
@@ -750,7 +784,8 @@ func TestDTDWithChildren(t *testing.T) {
 func TestWriteRaw(t *testing.T) {
 	startableRaw := func(node Startable) string {
 		b, w := open()
-		mustAll(w.Write(Raw("wat")), w.Start(node), w.Write(Raw("wat")), w.Next(), w.Write(Raw("wat")))
+		ec := &ErrCollector{}
+		ec.Must(w.Write(Raw("wat")), w.Start(node), w.Write(Raw("wat")), w.Next(), w.Write(Raw("wat")))
 		return str(b, w)
 	}
 	tt.Equals(t, `wat<?xml version="1.0" encoding="UTF-8"?>`+"\n"+`watwat`, startableRaw(Doc{}))
@@ -760,7 +795,7 @@ func TestWriteRaw(t *testing.T) {
 	tt.Equals(t, `wat<!--watfoowat`, startableRaw(Comment{Content: "foo"}))
 
 	b, w := open()
-	mustAll(
+	(&ErrCollector{}).Must(
 		w.Write(Raw("wat")), w.Start(Elem{Name: "foo"}),
 		w.Write(Raw("wat"), Attr{Name: "foo"}, Raw("wat")),
 		w.Next(), w.Write(Raw("wat")),
@@ -769,22 +804,23 @@ func TestWriteRaw(t *testing.T) {
 }
 
 func TestAllocs(t *testing.T) {
+	ec := &ErrCollector{}
 	w := Open(Null{})
 
 	_ = allocs()
 
 	before := allocs()
-	Must(w.StartDoc(Doc{}))
-	Must(w.StartElem(Elem{Name: "foo"}))
-	Must(w.StartElem(Elem{Name: "bar"}))
-	Must(w.WriteAttr(Attr{Name: "a"}.Bool(true)))
-	Must(w.StartElem(Elem{Name: "baz"}))
-	Must(w.WriteComment(Comment{"this is a comment"}))
-	Must(w.WriteCData(CData{"pants pants revolution"}))
-	Must(w.WriteRaw("pants pants revolution"))
-	Must(w.EndElem("baz"))
-	Must(w.EndElemFull("bar"))
-	Must(w.EndDoc())
+	ec.Must(w.StartDoc(Doc{}))
+	ec.Must(w.StartElem(Elem{Name: "foo"}))
+	ec.Must(w.StartElem(Elem{Name: "bar"}))
+	ec.Must(w.WriteAttr(Attr{Name: "a"}.Bool(true)))
+	ec.Must(w.StartElem(Elem{Name: "baz"}))
+	ec.Must(w.WriteComment(Comment{"this is a comment"}))
+	ec.Must(w.WriteCData(CData{"pants pants revolution"}))
+	ec.Must(w.WriteRaw("pants pants revolution"))
+	ec.Must(w.EndElem("baz"))
+	ec.Must(w.EndElemFull("bar"))
+	ec.Must(w.EndDoc())
 	after := allocs()
 	tt.Equals(t, uint64(0), after-before)
 	w.Flush()

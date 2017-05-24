@@ -58,22 +58,53 @@ type ErrCollector struct {
 	Err   error
 }
 
+// Error implements the error interface.
 func (e *ErrCollector) Error() string {
 	return fmt.Sprintf("error at %s:%d #%d - %v", e.File, e.Line, e.Index, e.Err)
 }
 
+// Panic causes the collector to panic if any error has been collected.
+//
+// This should be called in a defer:
+//
+//	func pants() {
+//		ec := &xmlwriter.ErrCollector{}
+//		defer ec.Panic()
+//		ec.Do(fmt.Errorf("this will panic at the end"))
+//		fmt.Printf("This will print")
+//	}
+//
 func (e *ErrCollector) Panic() {
 	if e.Err != nil {
 		panic(e)
 	}
 }
 
+// Set assigns the collector's internal error to an external error variable.
+//
+// This should be called in a defer with a named return to allow an error
+// to be easily returned if one is collected:
+//
+//	func pants() (err error) {
+//		ec := &xmlwriter.ErrCollector{}
+//		defer ec.Set(&err)
+//		ec.Do(fmt.Errorf("this error will be returned by the pants function"))
+//		fmt.Printf("This will print")
+//	}
+//
 func (e *ErrCollector) Set(err *error) {
 	if e.Err != nil {
 		*err = e
 	}
 }
 
+// Do collects the first error in a list of errors and holds on to it.
+//
+// If you pass the result of multiple functions to Do, they will not be
+// short circuited on failure - the first error is retained by the collector
+// and the rest are discarded. It is only intended to be used when you know
+// that subsequent calls after the first error are safe to make.
+//
 func (e *ErrCollector) Do(errs ...error) {
 	for i, err := range errs {
 		if err != nil {
@@ -87,6 +118,7 @@ func (e *ErrCollector) Do(errs ...error) {
 	}
 }
 
+// Must collects the first error in a list of errors and panics with it.
 func (e *ErrCollector) Must(errs ...error) {
 	for i, err := range errs {
 		if err != nil {

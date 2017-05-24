@@ -14,6 +14,7 @@ const (
 	defaultBufsize   = 2048
 )
 
+// Writer writes XML to an io.Writer.
 type Writer struct {
 	printer  printer
 	nodes    []node
@@ -22,11 +23,11 @@ type Writer struct {
 
 	last Event
 
-	// Perform validation on output
+	// Perform validation on output. Defaults to true when created using Open().
 	Enforce bool
 
-	// When checking characters, excludes an additional set of compatibility chars.
-	// Defaults to true. See check.go/CheckChars.
+	// When enforcing and checking characters, excludes an additional set of
+	// compatibility chars.  Defaults to true. See check.go/CheckChars.
 	StrictChars bool
 
 	// Version is placed into the `version="..."` attribute when writing a Doc{}.
@@ -37,15 +38,17 @@ type Writer struct {
 	// the default.
 	InitialBufSize int
 
+	// Defaults to \n.
 	NewlineString string
 
 	// Controls the indenting process used by the writer.
 	Indenter Indenter
 }
 
+// Option is an option to the Writer.
 type Option func(w *Writer)
 
-// WithIndent sets the Writer up to indent xml elements to make them
+// WithIndent sets the Writer up to indent XML elements to make them
 // easier to read using the StandardIndenter:
 //	w := xmlwriter.Open(b, xmlwriter.WithIndent())
 func WithIndent() Option {
@@ -82,12 +85,23 @@ func newWriter(w io.Writer, options ...Option) *Writer {
 	return xw
 }
 
+// Open opens the Writer using the UTF-8 encoding.
 func Open(w io.Writer, options ...Option) *Writer {
 	xw := newWriter(w, options...)
 	xw.encoding = "UTF-8"
 	return xw
 }
 
+// OpenEncoding opens the Writer using the supplied encoding.
+//
+// This example opens an XML writer using the utf16-be encoding:
+//
+//	enc := unicode.UTF16(unicode.BigEndian, unicode.ExpectBOM).NewEncoder()
+//	w := xmlwriter.OpenEncoding(b, "utf-16be", enc)
+//
+// You should still write UTF-8 strings to the writer - they are converted
+// on the fly to the target encoding.
+//
 func OpenEncoding(w io.Writer, encstr string, encoder *encoding.Encoder, options ...Option) *Writer {
 	enc := encoding.HTMLEscapeUnsupported(encoder).Writer(w)
 	xw := newWriter(enc, options...)
@@ -95,6 +109,7 @@ func OpenEncoding(w io.Writer, encstr string, encoder *encoding.Encoder, options
 	return xw
 }
 
+// Depth returns the number of opened Startable nodes on the stack.
 func (w *Writer) Depth() int {
 	return w.current
 }
@@ -134,6 +149,7 @@ func (w *Writer) Block(start Startable, nodes ...Writable) error {
 	return nil
 }
 
+// Write writes writable nodes.
 func (w *Writer) Write(nodes ...Writable) error {
 	for _, node := range nodes {
 		if err := node.write(w); err != nil {
@@ -143,6 +159,7 @@ func (w *Writer) Write(nodes ...Writable) error {
 	return nil
 }
 
+// Start starts a startable node.
 func (w *Writer) Start(nodes ...Startable) error {
 	for _, node := range nodes {
 		if err := node.start(w); err != nil {
@@ -158,34 +175,102 @@ func (w *Writer) Flush() error {
 	return w.printer.Flush()
 }
 
-// start methods for startables
+// {{{ start methods for startables
 
-func (w *Writer) StartDoc(doc Doc) error              { return doc.start(w) }
-func (w *Writer) StartComment(comment Comment) error  { return comment.start(w) }
-func (w *Writer) StartCData(cdata CData) error        { return cdata.start(w) }
-func (w *Writer) StartDTD(dtd DTD) error              { return dtd.start(w) }
+// StartDoc pushes an XML document node onto the writer's stack.
+func (w *Writer) StartDoc(doc Doc) error { return doc.start(w) }
+
+// StartComment pushes an XML comment node onto the writer's stack.
+// WriteCommentContent can be used to write contents.
+func (w *Writer) StartComment(comment Comment) error { return comment.start(w) }
+
+// StartCData pushes an XML CData node onto the writer's stack.
+// WriteCDataContent can be used to write contents.
+func (w *Writer) StartCData(cdata CData) error { return cdata.start(w) }
+
+// StartDTD pushes a Document Type Declaration node onto the writer's
+// stack.
+func (w *Writer) StartDTD(dtd DTD) error { return dtd.start(w) }
+
+// StartDTDAttList pushes a Document Type Declaration node onto the writer's
+// stack.
 func (w *Writer) StartDTDAttList(al DTDAttList) error { return al.start(w) }
-func (w *Writer) StartElem(elem Elem) error           { return elem.start(w) }
 
-// write methods for startables
+// StartElem pushes an XML element node onto the writer's stack.
+func (w *Writer) StartElem(elem Elem) error { return elem.start(w) }
 
-func (w *Writer) WriteCData(cdata CData) (err error)       { return cdata.write(w) }
+// }}}
+
+// {{{ write methods for startables
+
+// WriteCData writes a complete XML CData section. It can be written inside an
+// Elem or as a top-level node.
+func (w *Writer) WriteCData(cdata CData) (err error) { return cdata.write(w) }
+
+// WriteComment writes a complete XML Comment section. It can be written inside an
+// Elem, a DTD, a Doc, or as a top-level node.
 func (w *Writer) WriteComment(comment Comment) (err error) { return comment.write(w) }
-func (w *Writer) WriteElem(elem Elem) (err error)          { return elem.write(w) }
-func (w *Writer) WriteText(text string) (err error)        { return Text(text).write(w) }
 
-// write methods for non-startable writables
+// WriteElem writes a complete XML Element. It can be written inside an
+// Elem, a Doc, or as a top-level node.
+//
+// Nested elements and attributes can be written by assigning to the members
+// of the Elem struct to an arbitrary depth (though be warned that this can
+// cause heap escapes):
+//
+//	e := Elem{
+//		Name: "outer",
+//		Attrs: []Attr{Attr{Name: "key", Value: "val"}},
+//		Content: []Writable{Elem{Name: "inner"}},
+//	}
+//
+func (w *Writer) WriteElem(elem Elem) (err error) { return elem.write(w) }
 
-func (w *Writer) WriteCDataContent(cdata string) error           { return CDataContent(cdata).write(w) }
-func (w *Writer) WriteCommentContent(comment string) error       { return CommentContent(comment).write(w) }
-func (w *Writer) WriteDTDEntity(entity DTDEntity) error          { return entity.write(w) }
-func (w *Writer) WriteDTDElem(el DTDElem) error                  { return el.write(w) }
-func (w *Writer) WriteDTDAttr(attr DTDAttr) (err error)          { return attr.write(w) }
+// }}}
+
+// {{{ write methods for non-startable writables
+
+// WriteCDataContent writes text inside an already-started XML CData node.
+func (w *Writer) WriteCDataContent(cdata string) error { return CDataContent(cdata).write(w) }
+
+// WriteCommentContent writes text inside an already-started XML Comment node.
+func (w *Writer) WriteCommentContent(comment string) error { return CommentContent(comment).write(w) }
+
+// WriteDTDEntity writes a DTD Entity definition to the output. It can be
+// written inside a DTD or as a top-level node.
+func (w *Writer) WriteDTDEntity(entity DTDEntity) error { return entity.write(w) }
+
+// WriteDTDElem writes a DTD Element definition to the output. It can be
+// written inside a DTD or as a top-level node.
+func (w *Writer) WriteDTDElem(el DTDElem) error { return el.write(w) }
+
+// WriteDTDAttr writes a DTD Attribute definition to the output. It can be
+// written inside a DTDAttList or as a top-level node.
+func (w *Writer) WriteDTDAttr(attr DTDAttr) (err error) { return attr.write(w) }
+
+// WriteDTDAttList writes a DTD Attribute List to the output. It can be written inside
+// a DTD or as a top-level node.
 func (w *Writer) WriteDTDAttList(attlist DTDAttList) (err error) { return attlist.write(w) }
-func (w *Writer) WriteNotation(n Notation) (err error)           { return n.write(w) }
-func (w *Writer) WritePI(pi PI) error                            { return pi.write(w) }
-func (w *Writer) WriteRaw(raw string) error                      { return Raw(raw).write(w) }
 
+// WriteNotation writes an XML notation to the output. It can be written inside
+// a DTD or as a top-level node.
+func (w *Writer) WriteNotation(n Notation) (err error) { return n.write(w) }
+
+// WritePI writes an XML processing instruction to the output. It can be
+// written inside a Doc, an Elem or as a top-level node.
+func (w *Writer) WritePI(pi PI) error { return pi.write(w) }
+
+// WriteText writes an XML text node to the output. It will be appropriately
+// escaped. It can be written inside an Elem or as a top-level node.
+func (w *Writer) WriteText(text string) (err error) { return Text(text).write(w) }
+
+// WriteRaw writes a raw string to the output. This can be any string
+// whatsoever - it does not have to be valid XML and will be written exactly as
+// it is declared. Raw nodes can be written at any stage of the writing
+// process.
+func (w *Writer) WriteRaw(raw string) error { return Raw(raw).write(w) }
+
+// WriteAttr writes one or more XML element attributes to the output.
 func (w *Writer) WriteAttr(attrs ...Attr) (err error) {
 	for _, a := range attrs {
 		if err := a.write(w); err != nil {
@@ -195,7 +280,9 @@ func (w *Writer) WriteAttr(attrs ...Attr) (err error) {
 	return nil
 }
 
-// end methods
+// }}}
+
+// {{{ end methods
 
 // EndDoc ends the current xmlwriter.Doc{} and any node in between. This is not
 // the same as calling End(DocNode), which will only end a Doc{} if it is the
@@ -212,12 +299,30 @@ func (w *Writer) EndDoc() (err error) {
 	return w.End(DocNode)
 }
 
-func (w *Writer) EndCData() (err error)        { return w.End(CDataNode) }
-func (w *Writer) EndComment() (err error)      { return w.End(CommentNode) }
-func (w *Writer) EndDTD() (err error)          { return w.End(DTDNode) }
-func (w *Writer) EndDTDAttList() (err error)   { return w.End(DTDAttListNode) }
+// EndCData pops a CData node from the writer's stack, or returns an error
+// if the current node is not a CData.
+func (w *Writer) EndCData() (err error) { return w.End(CDataNode) }
+
+// EndComment pops a Comment node from the writer's stack, or returns an error
+// if the current node is not a Comment.
+func (w *Writer) EndComment() (err error) { return w.End(CommentNode) }
+
+// EndDTD pops a DTD node from the writer's stack, or returns an error
+// if the current node is not a DTD.
+func (w *Writer) EndDTD() (err error) { return w.End(DTDNode) }
+
+// EndDTDAttList pops a DTDAttList node from the writer's stack, or returns an
+// error if the current node is not a DTDAttList.
+func (w *Writer) EndDTDAttList() (err error) { return w.End(DTDAttListNode) }
+
+// EndElem pops an Elem node from the writer's stack, or returns an error if
+// the current node is not an Elem. If the Elem has had no children written, it
+// will be closed using the short close style: "<tag/>"
 func (w *Writer) EndElem(name ...string) error { return w.End(ElemNode, name...) }
 
+// EndElemFull pops an Elem node from the writer's stack, or returns an error if
+// the current node is not an Elem. It will always be closed using the full
+// element close style even if it contains no children: "<tag></tag>".
 func (w *Writer) EndElemFull(name ...string) error {
 	if w.current >= 0 {
 		w.nodes[w.current].elem.Full = true
@@ -330,6 +435,8 @@ func (w *Writer) EndAllFlush() error {
 	}
 	return w.Flush()
 }
+
+// }}}
 
 // {{{ Internal functions
 

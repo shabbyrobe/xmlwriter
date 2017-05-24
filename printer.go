@@ -43,15 +43,15 @@ import (
 // by the package, so we have to pull the source in ourselves.
 
 var (
-	esc_quot = []byte("&#34;") // shorter than "&quot;"
-	esc_apos = []byte("&#39;") // shorter than "&apos;"
-	esc_amp  = []byte("&amp;")
-	esc_lt   = []byte("&lt;")
-	esc_gt   = []byte("&gt;")
-	esc_tab  = []byte("&#x9;")
-	esc_nl   = []byte("&#xA;")
-	esc_cr   = []byte("&#xD;")
-	esc_fffd = []byte("\uFFFD") // Unicode replacement character
+	escQuot = []byte("&#34;") // shorter than "&quot;"
+	escApos = []byte("&#39;") // shorter than "&apos;"
+	escAmp  = []byte("&amp;")
+	escLt   = []byte("&lt;")
+	escGt   = []byte("&gt;")
+	escTab  = []byte("&#x9;")
+	escNl   = []byte("&#xA;")
+	escCr   = []byte("&#xD;")
+	escFffd = []byte("\uFFFD") // Unicode replacement character
 )
 
 type printer struct {
@@ -72,24 +72,24 @@ func (p printer) EscapeAttrString(s string) error {
 		i += width
 		switch r {
 		case '"':
-			esc = esc_quot
+			esc = escQuot
 		case '\'':
-			esc = esc_apos
+			esc = escApos
 		case '&':
-			esc = esc_amp
+			esc = escAmp
 		case '<':
-			esc = esc_lt
+			esc = escLt
 		case '>':
-			esc = esc_gt
+			esc = escGt
 		case '\t':
-			esc = esc_tab
+			esc = escTab
 		case '\n':
-			esc = esc_nl
+			esc = escNl
 		case '\r':
-			esc = esc_cr
+			esc = escCr
 		default:
 			if !isInCharacterRange(r) || (r == 0xFFFD && width == 1) {
-				esc = esc_fffd
+				esc = escFffd
 				break
 			}
 			continue
@@ -110,18 +110,18 @@ func (p printer) EscapeString(s string) error {
 		i += width
 		switch r {
 		case '"':
-			esc = esc_quot
+			esc = escQuot
 		case '\'':
-			esc = esc_apos
+			esc = escApos
 		case '&':
-			esc = esc_amp
+			esc = escAmp
 		case '<':
-			esc = esc_lt
+			esc = escLt
 		case '>':
-			esc = esc_gt
+			esc = escGt
 		default:
 			if !isInCharacterRange(r) || (r == 0xFFFD && width == 1) {
-				esc = esc_fffd
+				esc = escFffd
 				break
 			}
 			continue
@@ -210,13 +210,16 @@ func (p printer) writePublicID(publicID string, systemID string, enforce bool) e
 	p.WriteString("PUBLIC ")
 	p.WriteByte('"')
 	p.WriteString(publicID)
+
+	var err error
 	if systemID != "" {
 		p.WriteString("\" ")
-		return p.writeSystemID(systemID, enforce)
+		err = p.writeSystemID(systemID, enforce)
 	} else {
 		p.WriteString("\"")
-		return p.cachedWriteError()
+		err = p.cachedWriteError()
 	}
+	return err
 }
 
 func (p printer) printAttr(name, value string, enforce bool) error {

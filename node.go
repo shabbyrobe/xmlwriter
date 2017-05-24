@@ -1,11 +1,14 @@
 package xmlwriter
 
+// NodeKind is the kind of the node.
 type NodeKind int
 
+// Name returns a string representation of the NodeKind.
 func (n NodeKind) Name() string {
 	return kindName[n]
 }
 
+// Range of allowed NodeKind values.
 const (
 	NoNode NodeKind = iota
 	AttrNode
@@ -45,18 +48,20 @@ var kindName = map[NodeKind]string{
 	TextNode:           "text",
 }
 
+// NodeState is the state of the node being written.
 type NodeState int
 
+// Name returns a string representation fo the NodeState.
 func (n NodeState) Name() string { return stateName[n] }
 
 const (
-	// node is open but not opened, e.g. "<elem"
+	// StateOpen indicates the node is open but not opened, e.g. "<elem"
 	StateOpen NodeState = iota
 
-	// node is fully opened, e.g. "<elem>"
+	// StateOpened indicates the node is fully opened, e.g. "<elem>"
 	StateOpened
 
-	// node end, e.g. "</elem>"
+	// StateEnded indicates the node's end, e.g. "</elem>"
 	StateEnded
 )
 
@@ -66,6 +71,8 @@ var stateName = map[NodeState]string{
 	StateEnded:  "ended",
 }
 
+// Node represents an item which the Writer can Start and/or Write. It
+// is the wider type for Startable and Writable.
 type Node interface {
 	kind() NodeKind
 }

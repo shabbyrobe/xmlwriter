@@ -4,6 +4,7 @@ import (
 	"fmt"
 )
 
+// DTD represents a Document Type Definition to be written by the Writer.
 type DTD struct {
 	Name     string
 	PublicID string
@@ -37,9 +38,8 @@ func (d DTD) open(n *node, w *Writer) error {
 	if d.PublicID != "" || d.SystemID != "" {
 		w.printer.WriteByte(' ')
 		return w.printer.writeExternalID(d.PublicID, d.SystemID, w.Enforce)
-	} else {
-		return w.printer.cachedWriteError()
 	}
+	return w.printer.cachedWriteError()
 }
 
 func (d DTD) opened(n *node, w *Writer, prev NodeState) error {
@@ -58,12 +58,23 @@ func (d DTD) end(n *node, w *Writer, prev NodeState) error {
 	return w.printer.cachedWriteError()
 }
 
-const DTDEmpty = "EMPTY"
-const DTDAny = "ANY"
+// DTDElemEmpty is a DTDElem Decl used when the element is empty.
+const DTDElemEmpty = "EMPTY"
 
-const DTDPCData = "#PCDATA"
-const DTDCData = "CDATA"
+// DTDElemAny is a DTDElem Decl used when the element can contain any element.
+const DTDElemAny = "ANY"
 
+// DTDElemPCData is a DTDElem Decl used when the element can contain parsed
+// character data.
+const DTDElemPCData = "#PCDATA"
+
+// DTDElem represents a DTD element definition to be written by the Writer.
+//
+// Examples:
+//
+//	DTDElem{Name: "elem", Decl: DTDElemEmpty} -> <!ELEMENT elem EMPTY>
+//	DTDElem{Name: "elem", Decl: "(a|b)*"}     -> <!ELEMENT elem (a|b)*>
+//
 type DTDElem struct {
 	Name string
 	Decl string
@@ -103,6 +114,22 @@ func (d DTDElem) write(w *Writer) error {
 	return w.printer.cachedWriteError()
 }
 
+// DTDEntity represents a DTD entity definition to be written by the Writer.
+//
+// Examples:
+//
+//	DTDEntity{Name: "pants", Content: "&#62;"}
+//	<!ENTITY pants "&#62">
+//
+//	DTDEntity{Name: "pants", SystemID: "sys"}
+//	<!ENTITY pants SYSTEM "sys">
+//
+//	DTDEntity{Name: "pants", SystemID: "sys", IsPE: true}
+//	<!ENTITY % pants SYSTEM "sys">
+//
+//	DTDEntity{Name: "pants", SystemID: "sys", PublicID: "pub", NDataID: "nd"}
+//  <!ENTITY pants PUBLIC "pub" "sys" NDATA nd>
+//
 type DTDEntity struct {
 	Name     string
 	Content  string
@@ -181,6 +208,16 @@ func (d DTDEntity) write(w *Writer) error {
 	return w.printer.cachedWriteError()
 }
 
+// DTDAttList represents a DTD attribute list to be written by the Writer.
+//
+// Examples:
+//
+//	DTDAttList{Name: "yep", Attrs: []DTDAttr{
+//		{Name: "a1", Type: DTDAttrString, Required: true},
+//		{Name: "a2", Type: DTDAttrString, Required: true},
+//	}}))
+//	<!ATTLIST yep a1 CDATA #REQUIRED a2 CDATA #REQUIRED>
+//
 type DTDAttList struct {
 	Name  string
 	Attrs []DTDAttr
@@ -237,22 +274,26 @@ func (d DTDAttList) end(n *node, w *Writer, prev NodeState) error {
 	return w.printer.WriteByte('>')
 }
 
-type AttType string
+// DTDAttrType constrains the valid values for the Type property of the DTDAttr
+// struct.
+type DTDAttrType string
 
+// Range of allowed DTDAttrType values.
 const (
-	AttString   AttType = "CDATA"
-	AttID       AttType = "ID"
-	AttIDRef    AttType = "IDREF"
-	AttIDRefs   AttType = "IDREFS"
-	AttEntity   AttType = "ENTITY"
-	AttEntities AttType = "ENTITIES"
-	AttNmtoken  AttType = "NMTOKEN"
-	AttNmtokens AttType = "NMTOKENS"
+	DTDAttrString   DTDAttrType = "CDATA"
+	DTDAttrID       DTDAttrType = "ID"
+	DTDAttrIDRef    DTDAttrType = "IDREF"
+	DTDAttrIDRefs   DTDAttrType = "IDREFS"
+	DTDAttrEntity   DTDAttrType = "ENTITY"
+	DTDAttrEntities DTDAttrType = "ENTITIES"
+	DTDAttrNmtoken  DTDAttrType = "NMTOKEN"
+	DTDAttrNmtokens DTDAttrType = "NMTOKENS"
 )
 
+// DTDAttr represents a DTD attribute to be written by the Writer.
 type DTDAttr struct {
 	Name     string
-	Type     AttType
+	Type     DTDAttrType
 	Required bool
 	Decl     string
 }
@@ -309,6 +350,8 @@ func (d DTDAttr) write(w *Writer) error {
 	return w.printer.cachedWriteError()
 }
 
+// Notation represents an XML notation declaration to be written by the Writer.
+// https://www.w3.org/TR/xml/#dt-notation
 type Notation struct {
 	Name     string
 	SystemID string

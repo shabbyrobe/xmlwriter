@@ -5,6 +5,8 @@ import (
 	"strings"
 )
 
+// Raw represents a raw string to be written by the Writer. See
+// Writer.WriteRaw()
 type Raw string
 
 func (t Raw) kind() NodeKind { return RawNode }
@@ -22,6 +24,8 @@ func (t Raw) write(w *Writer) error {
 	return w.printer.cachedWriteError()
 }
 
+// Text represents an XML text section to be written by the Writer.
+// See Writer.WriteText()
 type Text string
 
 func (t Text) kind() NodeKind { return TextNode }
@@ -47,6 +51,8 @@ func (t Text) write(w *Writer) error {
 	return err
 }
 
+// CommentContent represents a text portion of an XML comment which can
+// be written after a Comment is Started.
 type CommentContent string
 
 func (c CommentContent) kind() NodeKind { return CommentContentNode }
@@ -81,6 +87,8 @@ func (c CommentContent) write(w *Writer) error {
 	return nil
 }
 
+// Comment represents an XML comment section which can be written or
+// started by the Writer.
 type Comment struct {
 	Content string
 }
@@ -128,6 +136,8 @@ func (c Comment) end(n *node, w *Writer, prev NodeState) error {
 	return w.printer.cachedWriteError()
 }
 
+// CDataContent represents a text portion of an XML CData section which can
+// be written after a CData is Started.
 type CDataContent string
 
 func (c CDataContent) kind() NodeKind { return CDataContentNode }
@@ -159,6 +169,8 @@ func (c CDataContent) write(w *Writer) error {
 	return nil
 }
 
+// CData represents an XML CData section which can be written or
+// started by the Writer.
 type CData struct {
 	Content string
 }
@@ -206,6 +218,25 @@ func (c CData) end(n *node, w *Writer, prev NodeState) error {
 	return w.printer.cachedWriteError()
 }
 
+// Doc represents an XML document which can be started by the writer.
+//
+// Examples (assuming UTF-8 encoding used with Writer):
+//
+//	Doc{}
+//	<?xml version="1.0" encoding="UTF-8"?>
+//
+//	Doc{}.WithStandalone(false)
+//	<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+//
+//	Doc{}.WithStandalone(true)
+//	<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+//
+//	Doc{SuppressVersion: true, SuppressEncoding: true}
+//	<?xml ?>
+//
+//	Doc{}.ForceVersion("pants").ForceEncoding("pants")
+//	<?xml version="pants" encoding="pants" ?>
+//
 type Doc struct {
 	// Do not print 'encoding="..."' into the document opening
 	SuppressEncoding bool
@@ -315,6 +346,7 @@ func (d Doc) end(n *node, w *Writer, prev NodeState) error {
 	return nil
 }
 
+// PI represents an XML processing instruction to be written by the Writer.
 type PI struct {
 	Target  string
 	Content string

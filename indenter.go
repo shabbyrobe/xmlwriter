@@ -1,13 +1,17 @@
 package xmlwriter
 
+// Indenter allows custom indenting strategies to be written for pretty
+// printing the resultant XML.
+//
+// Writing one of these little nightmares is not for the faint of heart - it's
+// a monumental pain to get indenting rules right. See StandardIndenter for a
+// glimpse into the abyss.
+//
 type Indenter interface {
 	// Indent is called every time a node transitions from one State
 	// to another. This allows whitespace (or anything, really) to be
 	// injected in between any two pieces that the writer writes to the
 	// document.
-	// It's not for the faint of heart - it's a monumental pain to get
-	// indenting rules right. See StandardIndenter for a glimpse into
-	// the abyss.
 	Indent(w *Writer, last Event, next Event) error
 
 	// Wrap is called on every Text and CommentContent node - if you
@@ -21,6 +25,12 @@ type indentLevel struct {
 	indents int
 }
 
+// StandardIndenter implements a primitive Indenter strategy for pretty
+// printing the Writer's XML output.
+//
+// StandardIndenter is used by the WithIndent writer option:
+//	w := xmlwriter.Open(b, xmlwriter.WithIndent())
+//
 type StandardIndenter struct {
 	// Output whitespace control
 	IndentString string
@@ -29,6 +39,7 @@ type StandardIndenter struct {
 	stack []indentLevel
 }
 
+// NewStandardIndenter creates a StandardIndenter.
 func NewStandardIndenter() *StandardIndenter {
 	si := &StandardIndenter{
 		IndentString: " ",
@@ -38,10 +49,12 @@ func NewStandardIndenter() *StandardIndenter {
 	return si
 }
 
+// Wrap satisfies the Indenter interface.
 func (s *StandardIndenter) Wrap(content string) string {
 	return content
 }
 
+// Indent satisfies the Indenter interface.
 func (s *StandardIndenter) Indent(w *Writer, last Event, next Event) error {
 	// fmt.Print(next.String())
 
@@ -106,8 +119,6 @@ func (s *StandardIndenter) Indent(w *Writer, last Event, next Event) error {
 	} else if next.Node == DocNode && next.State == StateEnded {
 		w.printer.WriteString(w.NewlineString)
 	}
-
-	// fmt.Println()
 
 	return w.printer.cachedWriteError()
 }
