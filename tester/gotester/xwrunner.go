@@ -38,6 +38,7 @@ const (
 
 var wsStrip = regexp.MustCompile(`[\n\r\t ]+`)
 
+// Script represents a gotester script.
 type Script struct {
 	XMLName  xml.Name  `xml:"script"`
 	Name     string    `xml:"string"`
@@ -45,6 +46,7 @@ type Script struct {
 	Commands []Command `xml:"command"`
 }
 
+// Command represents a gotester command.
 type Command struct {
 	XMLName xml.Name   `xml:"command"`
 	Action  string     `xml:"action,attr"`
@@ -55,20 +57,24 @@ type Command struct {
 	Params  []xml.Attr `xml:",any,attr"`
 }
 
+// ErrUnknownParam represents an unknown parameter error.
 type ErrUnknownParam struct {
 	Action string
 	Kind   string
 	Name   string
 }
 
+// NewErrUnknownParam makes an unknown param error.
 func NewErrUnknownParam(command Command, name string) ErrUnknownParam {
 	return ErrUnknownParam{command.Action, command.Kind, name}
 }
 
+// Error implements error.
 func (e ErrUnknownParam) Error() string {
 	return fmt.Sprintf("unknown param %s in command %s:%s", e.Name, e.Action, e.Kind)
 }
 
+// CleanContent cleans content.
 func (c Command) CleanContent() string {
 	r := c.Content
 	if c.WS == "strip" {
@@ -77,6 +83,7 @@ func (c Command) CleanContent() string {
 	return r
 }
 
+// XWRunner is an xwrunner.
 type XWRunner struct {
 	writer  io.Writer
 	xwriter *xw.Writer
@@ -85,6 +92,7 @@ type XWRunner struct {
 	active bool
 }
 
+// WriterConfig configures the xmlwriter.Writer.
 type WriterConfig struct {
 	Enforce       bool
 	StrictChars   bool
@@ -413,11 +421,13 @@ func (r *XWRunner) doEnd(command Command) error {
 				return fmt.Errorf("unknown end element param")
 			}
 		}
+		var err error
 		if full {
-			return r.xwriter.EndElemFull()
+			err = r.xwriter.EndElemFull()
 		} else {
-			return r.xwriter.EndElem()
+			err = r.xwriter.EndElem()
 		}
+		return err
 
 	default:
 		return fmt.Errorf("unknown kind")
@@ -437,6 +447,7 @@ func (r *XWRunner) flush() error {
 	return nil
 }
 
+// NewWriter creates a new xmlwriter.Writer for the script.
 func (s *Script) NewWriter(b io.Writer, options ...xw.Option) *xw.Writer {
 	w := xw.Open(b, options...)
 	if s.Enforce != nil {
@@ -445,6 +456,7 @@ func (s *Script) NewWriter(b io.Writer, options ...xw.Option) *xw.Writer {
 	return w
 }
 
+// Run runs the script.
 func (s *Script) Run(b io.Writer, options ...xw.Option) (err error) {
 	xw := &XWRunner{writer: b, options: options}
 	if err = s.Exec(xw); err != nil {
@@ -456,6 +468,7 @@ func (s *Script) Run(b io.Writer, options ...xw.Option) (err error) {
 	return nil
 }
 
+// Exec executes the script.
 func (s *Script) Exec(xw *XWRunner) (err error) {
 	for _, command := range s.Commands {
 

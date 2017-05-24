@@ -211,7 +211,7 @@ func TestElemWriteTree(t *testing.T) {
 	b, w := open()
 	ec.Must(w.Write(Elem{
 		Name:  "foo",
-		Attrs: []Attr{Attr{Name: "a", Value: "b"}},
+		Attrs: []Attr{{Name: "a", Value: "b"}},
 		Content: []Writable{
 			Elem{Name: "bar"},
 			Elem{Name: "baz", Content: []Writable{
