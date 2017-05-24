@@ -124,15 +124,8 @@ func (r *XWRunner) activate(enc *string) error {
 	return nil
 }
 
-func (r *XWRunner) doWrite(command Command) error {
-	if command.Kind != kindDoc && !r.active {
-		if err := r.activate(nil); err != nil {
-			return err
-		}
-	}
-
-	switch command.Kind {
-	case kindAttr:
+var writers = map[string]func(r *XWRunner, command Command) error{
+	kindAttr: func(r *XWRunner, command Command) error {
 		attr := xw.Attr{Name: command.Name, Value: command.CleanContent()}
 		for _, p := range command.Params {
 			switch p.Name.Local {
@@ -145,28 +138,28 @@ func (r *XWRunner) doWrite(command Command) error {
 			}
 		}
 		return r.xwriter.WriteAttr(attr)
-
-	case kindCData:
+	},
+	kindCData: func(r *XWRunner, command Command) error {
 		cdata := xw.CData{Content: command.CleanContent()}
 		if len(command.Params) > 0 {
 			return fmt.Errorf("unknown params")
 		}
 		return r.xwriter.WriteCData(cdata)
-
-	case kindCDataContent:
+	},
+	kindCDataContent: func(r *XWRunner, command Command) error {
 		if len(command.Params) > 0 {
 			return fmt.Errorf("unknown params")
 		}
 		return r.xwriter.WriteCDataContent(command.CleanContent())
-
-	case kindComment:
+	},
+	kindComment: func(r *XWRunner, command Command) error {
 		comment := xw.Comment{Content: command.CleanContent()}
 		if len(command.Params) > 0 {
 			return fmt.Errorf("unknown params")
 		}
 		return r.xwriter.WriteComment(comment)
-
-	case kindDTDAttr:
+	},
+	kindDTDAttr: func(r *XWRunner, command Command) error {
 		attr := xw.DTDAttr{
 			Name: command.Name,
 		}
@@ -184,8 +177,8 @@ func (r *XWRunner) doWrite(command Command) error {
 			}
 		}
 		return r.xwriter.WriteDTDAttr(attr)
-
-	case kindDTDElem:
+	},
+	kindDTDElem: func(r *XWRunner, command Command) error {
 		if len(command.Params) > 0 {
 			return fmt.Errorf("unknown params for DTD element")
 		}
@@ -194,8 +187,8 @@ func (r *XWRunner) doWrite(command Command) error {
 			Decl: command.CleanContent(),
 		}
 		return r.xwriter.WriteDTDElem(elem)
-
-	case kindDTDEntity:
+	},
+	kindDTDEntity: func(r *XWRunner, command Command) error {
 		entity := xw.DTDEntity{
 			Name:    command.Name,
 			Content: command.CleanContent(),
@@ -215,8 +208,8 @@ func (r *XWRunner) doWrite(command Command) error {
 			}
 		}
 		return r.xwriter.WriteDTDEntity(entity)
-
-	case kindNotation:
+	},
+	kindNotation: func(r *XWRunner, command Command) error {
 		notation := xw.Notation{
 			Name: command.Name,
 		}
@@ -231,8 +224,8 @@ func (r *XWRunner) doWrite(command Command) error {
 			}
 		}
 		return r.xwriter.WriteNotation(notation)
-
-	case kindPI:
+	},
+	kindPI: func(r *XWRunner, command Command) error {
 		target := ""
 		for _, p := range command.Params {
 			switch p.Name.Local {
@@ -243,8 +236,8 @@ func (r *XWRunner) doWrite(command Command) error {
 			}
 		}
 		return r.xwriter.WritePI(xw.PI{Target: target, Content: command.CleanContent()})
-
-	case kindRaw:
+	},
+	kindRaw: func(r *XWRunner, command Command) error {
 		// default mode should be to 'next' - this is for compat with the ctester.
 		next := true
 
@@ -266,40 +259,43 @@ func (r *XWRunner) doWrite(command Command) error {
 			}
 		}
 		return r.xwriter.WriteRaw(command.CleanContent())
-
-	case kindText:
+	},
+	kindText: func(r *XWRunner, command Command) error {
 		if len(command.Params) > 0 {
 			return fmt.Errorf("unknown params for text")
 		}
 		return r.xwriter.WriteText(command.CleanContent())
-
-	default:
-		spew.Dump(command)
-		return fmt.Errorf("unknown kind %s", command.Kind)
-	}
+	},
 }
 
-func (r *XWRunner) doStart(command Command) error {
+func (r *XWRunner) doWrite(command Command) error {
 	if command.Kind != kindDoc && !r.active {
 		if err := r.activate(nil); err != nil {
 			return err
 		}
 	}
+	h, ok := writers[command.Kind]
+	if !ok {
+		spew.Dump(command)
+		return fmt.Errorf("unknown kind %s", command.Kind)
+	}
+	return h(r, command)
+}
 
-	switch command.Kind {
-	case kindCData:
+var starters = map[string]func(r *XWRunner, command Command) error{
+	kindCData: func(r *XWRunner, command Command) error {
 		if len(command.Params) > 0 {
 			return fmt.Errorf("unknown params for cdata")
 		}
 		return r.xwriter.StartCData(xw.CData{})
-
-	case kindComment:
+	},
+	kindComment: func(r *XWRunner, command Command) error {
 		if len(command.Params) > 0 {
 			return fmt.Errorf("unknown params for comment")
 		}
 		return r.xwriter.StartComment(xw.Comment{})
-
-	case kindDoc:
+	},
+	kindDoc: func(r *XWRunner, command Command) error {
 		doc := xw.Doc{SuppressEncoding: true}
 		for _, p := range command.Params {
 			switch p.Name.Local {
@@ -329,8 +325,8 @@ func (r *XWRunner) doStart(command Command) error {
 		}
 
 		return r.xwriter.StartDoc(doc)
-
-	case kindDTD:
+	},
+	kindDTD: func(r *XWRunner, command Command) error {
 		dtd := xw.DTD{Name: command.Name}
 		for _, p := range command.Params {
 			switch p.Name.Local {
@@ -343,15 +339,15 @@ func (r *XWRunner) doStart(command Command) error {
 			}
 		}
 		return r.xwriter.StartDTD(dtd)
-
-	case kindDTDAttList:
+	},
+	kindDTDAttList: func(r *XWRunner, command Command) error {
 		if len(command.Params) > 0 {
 			return fmt.Errorf("unknown params dtd attlist")
 		}
 		al := xw.DTDAttList{Name: command.Name}
 		return r.xwriter.StartDTDAttList(al)
-
-	case kindElem:
+	},
+	kindElem: func(r *XWRunner, command Command) error {
 		elem := xw.Elem{Name: command.Name}
 		for _, p := range command.Params {
 			switch p.Name.Local {
@@ -364,54 +360,61 @@ func (r *XWRunner) doStart(command Command) error {
 			}
 		}
 		return r.xwriter.StartElem(elem)
-
-	default:
-		return fmt.Errorf("unknown kind")
-	}
+	},
 }
 
-func (r *XWRunner) doEnd(command Command) error {
-	if !r.active {
-		return fmt.Errorf("xwrunner: not active")
+func (r *XWRunner) doStart(command Command) error {
+	if command.Kind != kindDoc && !r.active {
+		if err := r.activate(nil); err != nil {
+			return err
+		}
 	}
-	switch command.Kind {
-	case kindAll:
+	h, ok := starters[command.Kind]
+	if !ok {
+		spew.Dump(command)
+		return fmt.Errorf("unknown kind %s", command.Kind)
+	}
+	return h(r, command)
+}
+
+var enders = map[string]func(r *XWRunner, command Command) error{
+	kindAll: func(r *XWRunner, command Command) error {
 		if len(command.Params) > 0 {
 			return fmt.Errorf("unknown params")
 		}
 		return r.xwriter.EndAll()
-
-	case kindCData:
+	},
+	kindCData: func(r *XWRunner, command Command) error {
 		if len(command.Params) > 0 {
 			return fmt.Errorf("unknown params")
 		}
 		return r.xwriter.EndCData()
-
-	case kindComment:
+	},
+	kindComment: func(r *XWRunner, command Command) error {
 		if len(command.Params) > 0 {
 			return fmt.Errorf("unknown params")
 		}
 		return r.xwriter.EndComment()
-
-	case kindDoc:
+	},
+	kindDoc: func(r *XWRunner, command Command) error {
 		if len(command.Params) > 0 {
 			return fmt.Errorf("unknown params")
 		}
 		return r.xwriter.EndDoc()
-
-	case kindDTD:
+	},
+	kindDTD: func(r *XWRunner, command Command) error {
 		if len(command.Params) > 0 {
 			return fmt.Errorf("unknown params")
 		}
 		return r.xwriter.EndDTD()
-
-	case kindDTDAttList:
+	},
+	kindDTDAttList: func(r *XWRunner, command Command) error {
 		if len(command.Params) > 0 {
 			return fmt.Errorf("unknown params")
 		}
 		return r.xwriter.EndDTDAttList()
-
-	case kindElem:
+	},
+	kindElem: func(r *XWRunner, command Command) error {
 		full := false
 		for _, param := range command.Params {
 			switch param.Name.Local {
@@ -428,10 +431,19 @@ func (r *XWRunner) doEnd(command Command) error {
 			err = r.xwriter.EndElem()
 		}
 		return err
+	},
+}
 
-	default:
-		return fmt.Errorf("unknown kind")
+func (r *XWRunner) doEnd(command Command) error {
+	if !r.active {
+		return fmt.Errorf("xwrunner: not active")
 	}
+	h, ok := enders[command.Kind]
+	if !ok {
+		spew.Dump(command)
+		return fmt.Errorf("unknown kind %s", command.Kind)
+	}
+	return h(r, command)
 }
 
 func (r *XWRunner) flush() error {
