@@ -1,4 +1,4 @@
-package xwrunner
+package main
 
 // this should do a better job of sanity checking the script - it's
 // too hard in the C version to get it nice.
@@ -168,7 +168,7 @@ func (r *XWRunner) doWrite(command Command) error {
 				attr.Decl = p.Value
 			case "type":
 				// TODO: validate
-				attr.Type = xw.AttType(p.Value)
+				attr.Type = xw.DTDAttrType(p.Value)
 			case "required":
 				attr.Required = strings.ToLower(p.Value) == "true"
 			default:

@@ -7,12 +7,11 @@ import (
 	"os"
 
 	"github.com/shabbyrobe/xmlwriter"
-	"github.com/shabbyrobe/xmlwriter/tester/xwrunner"
 )
 
 func main() {
 	var err error
-	var script xwrunner.Script
+	var script Script
 	var indent bool
 	var options []xmlwriter.Option
 
