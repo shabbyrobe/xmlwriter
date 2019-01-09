@@ -4,8 +4,9 @@ xmlwriter
 [![GoDoc](https://godoc.org/github.com/shabbyrobe/xmlwriter?status.svg)](https://godoc.org/github.com/shabbyrobe/xmlwriter)
 [![Go Report Card](https://goreportcard.com/badge/github.com/shabbyrobe/xmlwriter)](https://goreportcard.com/report/github.com/shabbyrobe/xmlwriter)
 
-xmlwriter is a Go library providing a procedural XML generation API based
-on libxml2's xmlwriter module.
+xmlwriter is a pure Go library providing a procedural XML generation API based
+on libxml2's xmlwriter module (don't be fooled by the language breakdown; there's
+an additional tester written in C but it's not part of the lib).
 
 The package is extensively documented on
 [GoDoc](https://godoc.org/github.com/shabbyrobe/xmlwriter).
