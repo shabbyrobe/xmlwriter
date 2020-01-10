@@ -1,8 +1,4 @@
-package tester
-
-// These tests are in the tester package rather than the xmlwriter
-// package to try to avoid issues with tools like dep vendoring more
-// stuff than it should (https://github.com/golang/dep/issues/120).
+package xmlwriter
 
 import (
 	"bytes"
@@ -10,8 +6,6 @@ import (
 	"strings"
 	"testing"
 	"unicode/utf8"
-
-	xw "github.com/shabbyrobe/xmlwriter"
 
 	tt "github.com/shabbyrobe/xmlwriter/testtool"
 	"golang.org/x/text/encoding"
@@ -22,12 +16,12 @@ import (
 func TestEncodingWindows1252(t *testing.T) {
 	b := &bytes.Buffer{}
 	enc := charmap.Windows1252.NewEncoder()
-	w := xw.OpenEncoding(b, "windows-1252", enc)
-	xw.Must(w.Start(xw.Doc{}))
-	xw.Must(w.Start(xw.Elem{Name: "hello"}))
-	xw.Must(w.Write(xw.Text("Résumé")))
-	xw.Must(w.Write(xw.Text("😀")))
-	xw.Must(w.EndAllFlush())
+	w := OpenEncoding(b, "windows-1252", enc)
+	tt.OK(t, w.Start(Doc{}))
+	tt.OK(t, w.Start(Elem{Name: "hello"}))
+	tt.OK(t, w.Write(Text("Résumé")))
+	tt.OK(t, w.Write(Text("😀")))
+	tt.OK(t, w.EndAllFlush())
 	out := b.Bytes()
 
 	// byte representation of expected windows-1252 encoded text -
@@ -39,12 +33,12 @@ func TestEncodingWindows1252(t *testing.T) {
 func TestEncodingUTF16BE(t *testing.T) {
 	b := &bytes.Buffer{}
 	enc := unicode.UTF16(unicode.BigEndian, unicode.ExpectBOM).NewEncoder()
-	w := xw.OpenEncoding(b, "utf-16be", enc)
-	xw.Must(w.Start(xw.Doc{}))
-	xw.Must(w.Start(xw.Elem{Name: "hello"}))
-	xw.Must(w.Write(xw.Text("Résumé")))
-	xw.Must(w.Write(xw.Text("😀")))
-	xw.Must(w.EndAllFlush())
+	w := OpenEncoding(b, "utf-16be", enc)
+	tt.OK(t, w.Start(Doc{}))
+	tt.OK(t, w.Start(Elem{Name: "hello"}))
+	tt.OK(t, w.Write(Text("Résumé")))
+	tt.OK(t, w.Write(Text("😀")))
+	tt.OK(t, w.EndAllFlush())
 	out := b.Bytes()
 
 	tt.Assert(t, bytes.HasPrefix(out, []byte{0xFE, 0xFF}))
@@ -55,11 +49,11 @@ func TestEncodingUTF16BE(t *testing.T) {
 func TestEncodeRunesInISO88591(t *testing.T) {
 	b := &bytes.Buffer{}
 	enc := charmap.ISO8859_1.NewEncoder()
-	w := xw.OpenEncoding(b, "ISO-8859-1", enc)
-	xw.Must(w.Start(xw.Doc{}))
-	xw.Must(w.Start(xw.Elem{Name: "hello"}))
-	xw.Must(w.Write(xw.Text("😀")))
-	xw.Must(w.EndAllFlush())
+	w := OpenEncoding(b, "ISO-8859-1", enc)
+	tt.OK(t, w.Start(Doc{}))
+	tt.OK(t, w.Start(Elem{Name: "hello"}))
+	tt.OK(t, w.Write(Text("😀")))
+	tt.OK(t, w.EndAllFlush())
 	out := b.String()
 
 	check := "<hello>&#128512;</hello>"
