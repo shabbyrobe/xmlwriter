@@ -158,25 +158,44 @@ var writers = map[string]func(r *XWRunner, command Command) error{
 		}
 		return r.xwriter.WriteComment(comment)
 	},
+
 	kindDTDAttr: func(r *XWRunner, command Command) error {
 		attr := xw.DTDAttr{
 			Name: command.Name,
 		}
+		var decl *string
+		var required bool
+
 		for _, p := range command.Params {
 			switch p.Name.Local {
 			case "decl":
-				attr.Decl = p.Value
+				v := p.Value
+				decl = &v
 			case "type":
 				// TODO: validate
 				attr.Type = xw.DTDAttrType(p.Value)
 			case "required":
-				attr.Required = strings.ToLower(p.Value) == "true"
+				required = strings.ToLower(p.Value) == "true"
 			default:
 				return NewErrUnknownParam(command, p.Name.Local)
 			}
 		}
+
+		if decl != nil && required {
+			attr.Default = xw.DTDAttrFixed
+			attr.Value = *decl
+		} else if decl != nil {
+			attr.Default = xw.DTDAttrDefault
+			attr.Value = *decl
+		} else if required {
+			attr.Default = xw.DTDAttrRequired
+		} else {
+			attr.Default = xw.DTDAttrImplied
+		}
+
 		return r.xwriter.WriteDTDAttr(attr)
 	},
+
 	kindDTDElem: func(r *XWRunner, command Command) error {
 		if len(command.Params) > 0 {
 			return fmt.Errorf("unknown params for DTD element")

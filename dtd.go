@@ -278,7 +278,6 @@ func (d DTDAttList) end(n *node, w *Writer, prev NodeState) error {
 // struct.
 type DTDAttrType string
 
-// Range of allowed DTDAttrType values.
 const (
 	DTDAttrString   DTDAttrType = "CDATA"
 	DTDAttrID       DTDAttrType = "ID"
@@ -290,12 +289,40 @@ const (
 	DTDAttrNmtokens DTDAttrType = "NMTOKENS"
 )
 
+// DTDAttrDefaultType represents the possible values from the DefaultDecl production in
+// the DTD spec:
+// https://www.w3.org/TR/REC-xml/#NT-DefaultDecl
+type DTDAttrDefaultType int
+
+const (
+	// If Value is empty, this attribute is DTDAttrImplied, otherwise it will be a
+	// standard DTDAttrDefault value (without #FIXED). If you need to represent the
+	// empty string as your default value, you will need to explicitly use DTDAttrDefault
+	// or DTDAttrFixed.
+	DTDAttrInfer DTDAttrDefaultType = iota
+
+	// DTDAttr.Value represents the default for this attribute. Value may be an
+	// empty string.
+	DTDAttrDefault
+
+	// The attribute MUST always be provided. DTDAttr.Value must be empty.
+	DTDAttrRequired
+
+	// No default value is provided. DTDAttr.Value must be empty.
+	DTDAttrImplied
+
+	// The #FIXED keyword states that the attribute MUST always have the default value.
+	// If the declaration is neither #REQUIRED nor #IMPLIED, then the AttValue value
+	// contains the declared default value.
+	DTDAttrFixed
+)
+
 // DTDAttr represents a DTD attribute to be written by the Writer.
 type DTDAttr struct {
-	Name     string
-	Type     DTDAttrType
-	Required bool
-	Decl     string
+	Name    string
+	Type    DTDAttrType
+	Default DTDAttrDefaultType
+	Value   string
 }
 
 func (d DTDAttr) kind() NodeKind { return DTDAttrNode }
@@ -329,24 +356,47 @@ func (d DTDAttr) write(w *Writer) error {
 	w.printer.WriteString(string(d.Type))
 	w.printer.WriteByte(' ')
 
-	if d.Decl != "" {
-		if d.Required {
-			w.printer.WriteString(`#FIXED `)
-		}
-		w.printer.WriteString(`"`)
-		w.printer.EscapeAttrString(d.Decl)
-		w.printer.WriteByte('"')
-
-	} else {
-		if d.Required {
-			w.printer.WriteString("#REQUIRED")
+	dflt := d.Default
+	if dflt == DTDAttrInfer {
+		if d.Value != "" {
+			dflt = DTDAttrDefault
 		} else {
-			w.printer.WriteString("#IMPLIED")
+			dflt = DTDAttrImplied
 		}
 	}
+
+	switch dflt {
+	case DTDAttrDefault:
+		w.printer.WriteString(`"`)
+		w.printer.EscapeAttrString(d.Value)
+		w.printer.WriteByte('"')
+
+	case DTDAttrFixed:
+		w.printer.WriteString(`#FIXED `)
+		w.printer.WriteString(`"`)
+		w.printer.EscapeAttrString(d.Value)
+		w.printer.WriteByte('"')
+
+	case DTDAttrRequired:
+		if d.Value != "" {
+			return fmt.Errorf("xmlwriter: #REQUIRED DTD attr must not declare Value")
+		}
+		w.printer.WriteString("#REQUIRED")
+
+	case DTDAttrImplied:
+		if d.Value != "" {
+			return fmt.Errorf("xmlwriter: #IMPLIED DTD attr must not declare Value")
+		}
+		w.printer.WriteString("#IMPLIED")
+
+	default:
+		return fmt.Errorf("xmlwriter: unknown DTDAttr default type")
+	}
+
 	if w.Indenter != nil {
 		w.last = Event{StateEnded, DTDAttrNode, 0}
 	}
+
 	return w.printer.cachedWriteError()
 }
 

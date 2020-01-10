@@ -716,23 +716,23 @@ func TestDTDAttList(t *testing.T) {
 
 	tt.Equals(t, `<!ATTLIST yep a1 CDATA #REQUIRED a2 CDATA #REQUIRED>`,
 		doWrite(DTDAttList{Name: "yep", Attrs: []DTDAttr{
-			{Name: "a1", Type: DTDAttrString, Required: true},
-			{Name: "a2", Type: DTDAttrString, Required: true},
+			{Name: "a1", Type: DTDAttrString, Default: DTDAttrRequired},
+			{Name: "a2", Type: DTDAttrString, Default: DTDAttrRequired},
 		}}))
 	tt.Equals(t, `<!ATTLIST yep a1 CDATA #FIXED "foo" a2 CDATA #FIXED "bar">`,
 		doWrite(DTDAttList{Name: "yep", Attrs: []DTDAttr{
-			{Name: "a1", Type: DTDAttrString, Decl: "foo", Required: true},
-			{Name: "a2", Type: DTDAttrString, Decl: "bar", Required: true},
+			{Name: "a1", Type: DTDAttrString, Value: "foo", Default: DTDAttrFixed},
+			{Name: "a2", Type: DTDAttrString, Value: "bar", Default: DTDAttrFixed},
 		}}))
 	tt.Equals(t, `<!ATTLIST yep a1 CDATA "foo" a2 CDATA "bar">`,
 		doWrite(DTDAttList{Name: "yep", Attrs: []DTDAttr{
-			{Name: "a1", Type: DTDAttrString, Decl: "foo"},
-			{Name: "a2", Type: DTDAttrString, Decl: "bar"},
+			{Name: "a1", Type: DTDAttrString, Value: "foo"},
+			{Name: "a2", Type: DTDAttrString, Value: "bar"},
 		}}))
 
 	tt.Equals(t, `<!ATTLIST yep a1 CDATA "foo" a2 CDATA "bar">`,
-		doBlock(DTDAttList{Name: "yep"}, DTDAttr{Name: "a1", Type: DTDAttrString, Decl: "foo"},
-			DTDAttr{Name: "a2", Type: DTDAttrString, Decl: "bar"}))
+		doBlock(DTDAttList{Name: "yep"}, DTDAttr{Name: "a1", Type: DTDAttrString, Value: "foo"},
+			DTDAttr{Name: "a2", Type: DTDAttrString, Value: "bar"}))
 
 	tt.Pattern(t, `(?i)name must not be empty`, doWriteErrMsg(DTDAttList{}))
 	tt.Pattern(t, `(?i)invalid name`, doWriteErrMsg(DTDAttList{Name: "1"}))
