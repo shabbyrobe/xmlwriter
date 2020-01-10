@@ -28,21 +28,9 @@ func CheckEncoding(encoding string) error {
 // rules: https://www.w3.org/TR/xml/#NT-NameStartChar
 func CheckName(name string) error {
 	for i, rn := range name {
-		if rn == ':' || rn == '_' ||
-			(rn >= 'A' && rn <= 'Z') ||
-			(rn >= 'a' && rn <= 'z') ||
-			(rn >= 0xC0 && rn <= 0xD6) ||
-			(rn >= 0xD8 && rn <= 0xF6) ||
-			(rn >= 0xF8 && rn <= 0x2FF) ||
-			(rn >= 0x370 && rn <= 0x37D) {
+		v := int(nameChar[uint16(rn)]) - 1
+		if v >= 0 && v <= i {
 			continue
-		}
-		if i != 0 {
-			if rn == '-' || rn == '.' || (rn >= '0' && rn <= '9') || rn == 0xB7 ||
-				(rn >= 0x300 && rn <= 0x36F) ||
-				(rn >= 0x203F && rn <= 0x2040) {
-				continue
-			}
 		}
 		return fmt.Errorf("xmlwriter: invalid name at position %d: %c", i, rn)
 	}
