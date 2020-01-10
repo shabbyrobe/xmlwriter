@@ -1,7 +1,5 @@
 package testtool
 
-// https://github.com/benbjohnson/testing
-
 import (
 	"fmt"
 	"path/filepath"

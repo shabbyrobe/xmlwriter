@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"runtime"
 	"strings"
 	"testing"
@@ -17,12 +18,6 @@ var memstats runtime.MemStats
 func allocs() uint64 {
 	runtime.ReadMemStats(&memstats)
 	return memstats.Mallocs
-}
-
-type Null struct{}
-
-func (w Null) Write(p []byte) (n int, err error) {
-	return len(p), nil
 }
 
 type DodgyWriter struct {
@@ -44,7 +39,7 @@ func open(o ...Option) (*bytes.Buffer, *Writer) {
 }
 
 func openNull(o ...Option) *Writer {
-	return Open(Null{}, o...)
+	return Open(ioutil.Discard, o...)
 }
 
 func str(b *bytes.Buffer, w *Writer) string {
@@ -805,7 +800,7 @@ func TestWriteRaw(t *testing.T) {
 
 func TestAllocs(t *testing.T) {
 	ec := &ErrCollector{}
-	w := Open(Null{})
+	w := Open(ioutil.Discard)
 
 	_ = allocs()
 

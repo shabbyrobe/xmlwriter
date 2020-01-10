@@ -2,6 +2,7 @@ package xmlwriter
 
 import (
 	"encoding/xml"
+	"io/ioutil"
 	"testing"
 )
 
@@ -13,7 +14,7 @@ func must(err error) {
 
 func BenchmarkWriterGeneral(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		w := Open(Null{})
+		w := Open(ioutil.Discard)
 
 		must(w.StartDoc(Doc{}))
 		must(w.StartElem(Elem{Name: "foo"}))
@@ -69,7 +70,7 @@ func benchmarkWriter(b *testing.B, cnt int) {
 	o := makeStruct(cnt)
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
-		w := Open(Null{})
+		w := Open(ioutil.Discard)
 
 		must(w.StartDoc(Doc{}))
 		must(w.StartElem(Elem{Name: o.Name}))
@@ -87,7 +88,7 @@ func benchmarkGolang(b *testing.B, cnt int) {
 	o := makeStruct(cnt)
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
-		must(xml.NewEncoder(Null{}).Encode(o))
+		must(xml.NewEncoder(ioutil.Discard).Encode(o))
 	}
 }
 
