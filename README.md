@@ -40,10 +40,10 @@ xmlwriter is about twice as quick as using the stdlib's `encoding/xml` and
 offers total control of the output. If you don't require that level of control,
 it's probably better to stick with `encoding/xml`
 
-    BenchmarkWriterHuge-4      	     100	  13228917 ns/op	    4944 B/op	       4 allocs/op
-    BenchmarkWriterSmall-4     	  200000	      6639 ns/op	    4944 B/op	       4 allocs/op
-    BenchmarkGolangHuge-4      	      50	  32770333 ns/op	 4324496 B/op	   60008 allocs/op
-    BenchmarkGolangSmall-4     	  100000	     13161 ns/op	    5936 B/op	      28 allocs/op
+    BenchmarkWriterHuge-8     	     165	   7189290 ns/op	    4944 B/op	       4 allocs/op
+    BenchmarkWriterSmall-8    	  299679	      4035 ns/op	    4944 B/op	       4 allocs/op
+    BenchmarkGolangHuge-8      	      52	  21770422 ns/op	 4324496 B/op	   60008 allocs/op
+    BenchmarkGolangSmall-8    	  139767	      8828 ns/op	    5936 B/op	      28 allocs/op
 
 xmlwriter is exhaustively tested using a fairly insane mess of C scripts you
 can find in the `tester/` directory.
