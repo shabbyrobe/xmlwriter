@@ -33,7 +33,7 @@ while getopts ":f:l:d:q:" opt; do
     esac
 done
 
-if [[ ! -z "$query" && -z "$db" ]]; then
+if [[ -n "$query" && -z "$db" ]]; then
     echo >&2 "Cannot use -q without -d"
     exit 1
 fi
@@ -73,24 +73,24 @@ cleanup() {
     local f
     jobs -p | xargs kill >/dev/null 2>&1
     for f in "${cleanup_files[@]}"; do
-        if [[ ! -z "$f" ]]; then
+        if [[ -n "$f" ]]; then
             rm -f "$f"
         fi
     done
 }
 
 xmlclean() {
-    ./tools xmlclean
+    ./tools.sh xmlclean
 }
 
 skip() {
     skip="$((skip+1))"
-    echo -e "SKIP\t$i\t$line\t$1"
+    echo -e "\e[93mSKIP\e[0m\t$i\t$line\t$1"
 }
 
 fail() {
     fail="$((fail+1))"
-    echo -e "FAIL\t$i\t$line\t$1"
+    echo -e "\e[91mFAIL\e[0m\t$i\t$line\t$1"
 }
 
 trap cleanup INT TERM
@@ -100,7 +100,7 @@ pass=0
 skip=0
 fail=0
 
-while read line; do
+while read -r line; do
     if [[ ! -f "$line" ]]; then
         skip "file does not exist"
         continue
@@ -110,8 +110,8 @@ while read line; do
 
     i="$((i+1))"
     # file --mime sees bare xml without a doc declaration as text/html
-    if [[ "$mime" != "application/xml;"* && "$mime" != "text/plain;"* && "$mime" != "text/html;"* ]]; then
-        skip "mime type not application/xml, text/html or text/plain"
+    if [[ "$mime" != "text/xml;"* && "$mime" != "application/xml;"* && "$mime" != "text/plain;"* && "$mime" != "text/html;"* ]]; then
+        skip "mime type not text/xml, application/xml, text/html or text/plain; found '$mime'"
         continue
     fi
     enc="$( <"$line" encextractor || true )"
@@ -133,7 +133,7 @@ while read line; do
     # find any more bugs.
     infile="$line"
     if [[ "${enc^^}" != "UTF-8" ]]; then 
-        echo -e "CONV\t$enc\tUTF-8\t$line"
+        echo -e "\e[94mCONV\e[0m\t$enc\tUTF-8\t$line"
         if ! iconv -f "$enc" -t "UTF-8" "$line" | encfixer -f "UTF-8" > "$input"; then
             fail "iconv failed"
             continue
@@ -150,7 +150,7 @@ while read line; do
 
     # xmllint will spew errors to stderr and still return 0!
     <"$infile" xmlclean > "$orig_out" 2>"$error_file" || rc="$?"
-    if [[ -s "$error_file" || ! -z "$rc" ]]; then
+    if [[ -s "$error_file" || -n "$rc" ]]; then
         skip "invalid xml"
         continue
     fi
@@ -186,13 +186,13 @@ while read line; do
     cmp -s "$orig_out"  "$gotest_out" || rco=$?
     cmp -s "$ctest_out" "$gotest_out" || rcc=$?
 
-    if [[ ! -z "$rco" || ! -z "$rcc" ]]; then
-        if [[ ! -z "$rco" ]]; then
+    if [[ -n "$rco" || -n "$rcc" ]]; then
+        if [[ -n "$rco" ]]; then
             fail "orig does not compare to gowriter"
             diff -u <( xmllint --format "$orig_out" ) <( xmllint --format "$gotest_out" ) \
                 >/tmp/result-"$i"-orig || true
         fi
-        if [[ ! -z "$rcc" ]]; then
+        if [[ -n "$rcc" ]]; then
             fail "libxml does not compare to gowriter"
             diff -u <( xmllint --format "$ctest_out" ) <( xmllint --format "$gotest_out" ) \
                 >/tmp/result-"$i"-ctest || true
@@ -205,13 +205,13 @@ while read line; do
     fi
 
 done < <(
-    if [[ ! -z "$db" ]]; then
+    if [[ -n "$db" ]]; then
         indexer query "$db" "$query"
     fi
-    if [[ ! -z "$file" ]]; then
+    if [[ -n "$file" ]]; then
         echo "$file"
     fi
-    if [[ ! -z "$filelist" ]]; then
+    if [[ -n "$filelist" ]]; then
         cat "$filelist"
     fi
 )

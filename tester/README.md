@@ -103,7 +103,7 @@ you might want to test:
 
 To build:
 
-    sudo apt install libxml2 iconv libsqlite3-dev libexpat-dev libmagic-dev
+    sudo apt install libxml2 libxml2-utils libsqlite3-dev libexpat1-dev libmagic-dev
     ( cd ctester; make )
 
 This process is a bit fraught and requires a few additional terrible C programs,
