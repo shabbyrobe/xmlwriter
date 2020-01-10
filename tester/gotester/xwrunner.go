@@ -10,7 +10,6 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/davecgh/go-spew/spew"
 	"golang.org/x/text/encoding"
 	"golang.org/x/text/encoding/charmap"
 
@@ -276,7 +275,6 @@ func (r *XWRunner) doWrite(command Command) error {
 	}
 	h, ok := writers[command.Kind]
 	if !ok {
-		spew.Dump(command)
 		return fmt.Errorf("unknown kind %s", command.Kind)
 	}
 	return h(r, command)
@@ -371,7 +369,6 @@ func (r *XWRunner) doStart(command Command) error {
 	}
 	h, ok := starters[command.Kind]
 	if !ok {
-		spew.Dump(command)
 		return fmt.Errorf("unknown kind %s", command.Kind)
 	}
 	return h(r, command)
@@ -440,7 +437,6 @@ func (r *XWRunner) doEnd(command Command) error {
 	}
 	h, ok := enders[command.Kind]
 	if !ok {
-		spew.Dump(command)
 		return fmt.Errorf("unknown kind %s", command.Kind)
 	}
 	return h(r, command)
