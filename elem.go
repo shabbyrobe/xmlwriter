@@ -95,21 +95,18 @@ func (e Elem) open(n *node, w *Writer) error {
 	return w.printer.cachedWriteError()
 }
 
-func (e Elem) writeNS(n *node, w *Writer) error {
-	for i, ns := range e.namespaces {
-		if ns.written == false {
-			if err := w.printer.printAttr("xmlns:"+ns.prefix, ns.uri, w.Enforce); err != nil {
-				return err
-			}
-			n.elem.namespaces[i].written = true
-		}
-	}
-	return nil
-}
-
 func (e Elem) opened(n *node, w *Writer, prev NodeState) error {
 	if len(e.namespaces) > 0 {
+		for i, ns := range e.namespaces {
+			if ns.written == false {
+				if err := w.printer.printAttr("xmlns:"+ns.prefix, ns.uri, w.Enforce); err != nil {
+					return err
+				}
+				n.elem.namespaces[i].written = true
+			}
+		}
 	}
+
 	if n.children == 0 && !e.Full && len(e.Content) == 0 {
 		w.printer.WriteString("/>")
 	} else {
