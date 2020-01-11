@@ -25,15 +25,28 @@ func CheckEncoding(encoding string) error {
 }
 
 // CheckName ensures a string satisfies the following production
-// rules: https://www.w3.org/TR/xml/#NT-NameStartChar
+// rules: https://www.w3.org/TR/xml/#NT-NameStartChar, with the exception
+// that it does not return an error on an empty string.
 func CheckName(name string) error {
-	for i, rn := range name {
-		v := int(nameChar[uint16(rn)]) - 1
-		if v >= 0 && v <= i {
-			continue
+	var start int
+	var rn rune
+	for start, rn = range name {
+		if start == 0 {
+			if rn > 0xFFFF || nameChar[uint16(rn)] != 1 {
+				return fmt.Errorf("xmlwriter: invalid name at position %d: %c", 0, rn)
+			}
+
+		} else {
+			break
 		}
-		return fmt.Errorf("xmlwriter: invalid name at position %d: %c", i, rn)
 	}
+
+	for i, rn := range name[start:] {
+		if rn > 0xFFFF || nameChar[uint16(rn)] == 0 {
+			return fmt.Errorf("xmlwriter: invalid name at position %d: %c", start+i, rn)
+		}
+	}
+
 	return nil
 }
 

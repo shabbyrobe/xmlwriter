@@ -1,58 +1,5 @@
 package xmlwriter
 
-// NodeKind is the kind of the node.
-type NodeKind int
-
-// Name returns a string representation of the NodeKind.
-func (n NodeKind) Name() string {
-	if int(n) < nodeKindLength {
-		return kindName[n]
-	}
-	return ""
-}
-
-// Range of allowed NodeKind values.
-const (
-	NoNode NodeKind = iota
-	AttrNode
-	CDataNode
-	CDataContentNode
-	CommentNode
-	CommentContentNode
-	DTDNode
-	DTDAttListNode
-	DTDAttrNode
-	DTDElemNode
-	DTDEntityNode
-	DocNode
-	ElemNode
-	NotationNode
-	PINode
-	RawNode
-	TextNode
-
-	nodeKindLength int = iota
-)
-
-var kindName = [nodeKindLength]string{
-	NoNode:             "none",
-	AttrNode:           "attr",
-	CDataNode:          "cdata",
-	CDataContentNode:   "cdatacontent",
-	CommentNode:        "comment",
-	CommentContentNode: "commentcontent",
-	DTDNode:            "dtd",
-	DTDAttListNode:     "dtdattlist",
-	DTDAttrNode:        "dtdattr",
-	DTDElemNode:        "dtdelem",
-	DTDEntityNode:      "dtdentity",
-	DocNode:            "document",
-	ElemNode:           "elem",
-	NotationNode:       "notation",
-	RawNode:            "raw",
-	TextNode:           "text",
-}
-
 // NodeState is the state of the node being written.
 type NodeState int
 
@@ -119,6 +66,7 @@ type node struct {
 
 	// bogus tagged union, this keeps things from escaping to the heap
 	kind       NodeKind
+	flag       nodeFlag
 	comment    Comment
 	cdata      CData
 	doc        Doc

@@ -61,7 +61,7 @@ func (a Attr) Float64(v float64) Attr { a.Value = strconv.FormatFloat(v, 'g', -1
 
 func (a Attr) write(w *Writer) error {
 	if w.Enforce {
-		if err := w.checkParent(NoNode, ElemNode); err != nil {
+		if err := w.checkParent(noNodeFlag | elemNodeFlag); err != nil {
 			return err
 		}
 	}

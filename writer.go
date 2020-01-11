@@ -444,50 +444,42 @@ func (w *Writer) writeIndent(next Event) error {
 	return w.Indenter.Indent(w, w.last, next)
 }
 
-func (w *Writer) pushBegin(kind NodeKind, parents []NodeKind) error {
+func (w *Writer) pushBegin(kind NodeKind, parents nodeFlag) error {
 	if w.Enforce {
-		if err := w.checkParent(parents...); err != nil {
+		if err := w.checkParent(parents); err != nil {
 			return err
 		}
 	}
 	if len(w.nodes) <= w.current+1 {
 		w.nodes = append(w.nodes, node{})
 	}
-	if err := w.Next(); err != nil {
-		return err
-	}
-	return nil
+	return w.Next()
 }
 
 func (w *Writer) pushEnd() error {
 	w.current++
-	if err := w.nodes[w.current].open(w); err != nil {
-		return err
-	}
-	return nil
+	return w.nodes[w.current].open(w)
 }
 
-func (w *Writer) checkParent(kinds ...NodeKind) error {
-	currentKind := NoNode
+func (w *Writer) checkParent(nodeFlags nodeFlag) error {
+	currentFlag := noNodeFlag
 	if w.current >= 0 {
-		currentKind = w.nodes[w.current].kind
+		currentFlag = w.nodes[w.current].flag
 	}
-	valid := false
-	for _, check := range kinds {
-		if check == currentKind {
-			valid = true
-			break
-		}
-	}
-	if !valid {
+
+	if currentFlag&nodeFlags == 0 {
 		// this used to be an error value, but it caused the ...NodeKind
 		// arg to escape to the heap.
-		names := make([]string, len(kinds))
-		for i, nk := range kinds {
-			names[i] = nk.Name()
+		names := nodeFlags.names()
+
+		var currentKind NodeKind
+		if w.current >= 0 {
+			currentKind = w.nodes[w.current].kind
 		}
-		return fmt.Errorf("xmlwriter: unexpected kind %s, expected %s", currentKind.Name(), strings.Join(names, ", "))
+
+		return fmt.Errorf("xmlwriter: unexpected kind %s, expected %s", currentKind.Name(), names)
 	}
+
 	return nil
 }
 
@@ -510,6 +502,7 @@ func (w *Writer) pop(kinds ...NodeKind) error {
 	if w.current < 0 {
 		return fmt.Errorf("xmlwriter: could not pop node")
 	}
+
 	valid := true
 	if len(kinds) > 0 {
 		currentKind := w.nodes[w.current].kind

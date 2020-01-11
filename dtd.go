@@ -14,12 +14,13 @@ type DTD struct {
 func (d DTD) kind() NodeKind { return DTDNode }
 
 func (d DTD) start(w *Writer) error {
-	if err := w.pushBegin(DTDNode, []NodeKind{NoNode, DocNode}); err != nil {
+	if err := w.pushBegin(DTDNode, noNodeFlag|docNodeFlag); err != nil {
 		return err
 	}
 	np := &w.nodes[w.current+1]
 	np.clear()
 	np.kind = DTDNode
+	np.flag = dtdNodeFlag
 	np.dtd = d
 	return w.pushEnd()
 }
@@ -58,15 +59,17 @@ func (d DTD) end(n *node, w *Writer, prev NodeState) error {
 	return w.printer.cachedWriteError()
 }
 
-// DTDElemEmpty is a DTDElem Decl used when the element is empty.
-const DTDElemEmpty = "EMPTY"
+const (
+	// DTDElemEmpty is a DTDElem Decl used when the element is empty.
+	DTDElemEmpty = "EMPTY"
 
-// DTDElemAny is a DTDElem Decl used when the element can contain any element.
-const DTDElemAny = "ANY"
+	// DTDElemAny is a DTDElem Decl used when the element can contain any element.
+	DTDElemAny = "ANY"
 
-// DTDElemPCData is a DTDElem Decl used when the element can contain parsed
-// character data.
-const DTDElemPCData = "#PCDATA"
+	// DTDElemPCData is a DTDElem Decl used when the element can contain parsed
+	// character data.
+	DTDElemPCData = "#PCDATA"
+)
 
 // DTDElem represents a DTD element definition to be written by the Writer.
 //
@@ -86,7 +89,7 @@ func (d DTDElem) writable() {}
 
 func (d DTDElem) write(w *Writer) error {
 	if w.Enforce {
-		if err := w.checkParent(NoNode, DTDNode); err != nil {
+		if err := w.checkParent(noNodeFlag | dtdNodeFlag); err != nil {
 			return err
 		}
 		if len(d.Name) == 0 {
@@ -151,7 +154,7 @@ func (d DTDEntity) write(w *Writer) error {
 		if err := CheckName(d.Name); err != nil {
 			return err
 		}
-		if err := w.checkParent(NoNode, DTDNode); err != nil {
+		if err := w.checkParent(noNodeFlag | dtdNodeFlag); err != nil {
 			return err
 		}
 	}
@@ -224,12 +227,13 @@ type DTDAttList struct {
 }
 
 func (d DTDAttList) start(w *Writer) error {
-	if err := w.pushBegin(DTDAttListNode, []NodeKind{NoNode, DTDNode}); err != nil {
+	if err := w.pushBegin(DTDAttListNode, noNodeFlag|dtdNodeFlag); err != nil {
 		return err
 	}
 	np := &w.nodes[w.current+1]
 	np.clear()
 	np.kind = DTDAttListNode
+	np.flag = dtdAttListNodeFlag
 	np.dtdAttList = d
 	return w.pushEnd()
 }
@@ -329,7 +333,7 @@ func (d DTDAttr) kind() NodeKind { return DTDAttrNode }
 
 func (d DTDAttr) write(w *Writer) error {
 	if w.Enforce {
-		if err := w.checkParent(NoNode, DTDAttListNode); err != nil {
+		if err := w.checkParent(noNodeFlag | dtdAttListNodeFlag); err != nil {
 			return err
 		}
 		if len(d.Name) == 0 {
@@ -412,7 +416,7 @@ func (n Notation) kind() NodeKind { return NotationNode }
 
 func (n Notation) write(w *Writer) error {
 	if w.Enforce {
-		if err := w.checkParent(NoNode, DTDNode); err != nil {
+		if err := w.checkParent(noNodeFlag | dtdNodeFlag); err != nil {
 			return err
 		}
 		if len(n.Name) == 0 {

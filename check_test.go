@@ -22,6 +22,10 @@ func TestCheckName(t *testing.T) {
 		{":", true},
 		{"!", false},
 		{"\u00df", true},
+
+		// This should catch the mistake I made where truncating the rune to a
+		// uint16 could yield a valid character:
+		{"\U00010041", false},
 	} {
 		t.Run(fmt.Sprintf("%d", idx), func(t *testing.T) {
 			err := CheckName(tc.name)

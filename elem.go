@@ -31,12 +31,13 @@ type ns struct {
 func (e Elem) kind() NodeKind { return ElemNode }
 
 func (e Elem) start(w *Writer) error {
-	if err := w.pushBegin(ElemNode, []NodeKind{NoNode, DocNode, ElemNode}); err != nil {
+	if err := w.pushBegin(ElemNode, noNodeFlag|docNodeFlag|elemNodeFlag); err != nil {
 		return err
 	}
 	np := &w.nodes[w.current+1]
 	np.clear()
 	np.kind = ElemNode
+	np.flag = elemNodeFlag
 	np.elem = e
 	return w.pushEnd()
 }

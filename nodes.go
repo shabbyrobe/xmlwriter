@@ -36,7 +36,7 @@ func (t Text) write(w *Writer) error {
 		s = w.Indenter.Wrap(s)
 	}
 	if w.Enforce {
-		if err := w.checkParent(NoNode, ElemNode); err != nil {
+		if err := w.checkParent(noNodeFlag | elemNodeFlag); err != nil {
 			return err
 		}
 		// TODO: CharData ::= [^<&]* - ([^<&]* ']]>' [^<&]*)
@@ -63,7 +63,7 @@ func (c CommentContent) write(w *Writer) error {
 		s = w.Indenter.Wrap(s)
 	}
 	if w.Enforce {
-		if err := w.checkParent(NoNode, CommentNode); err != nil {
+		if err := w.checkParent(noNodeFlag | commentNodeFlag); err != nil {
 			return err
 		}
 		// FIXME: we could escape this. should we?
@@ -94,12 +94,13 @@ type Comment struct {
 }
 
 func (c Comment) start(w *Writer) error {
-	if err := w.pushBegin(CommentNode, []NodeKind{NoNode, DocNode, DTDNode, ElemNode}); err != nil {
+	if err := w.pushBegin(CommentNode, noNodeFlag|docNodeFlag|dtdNodeFlag|elemNodeFlag); err != nil {
 		return err
 	}
 	np := &w.nodes[w.current+1]
 	np.clear()
 	np.kind = CommentNode
+	np.flag = commentNodeFlag
 	np.comment = c
 	return w.pushEnd()
 }
@@ -145,7 +146,7 @@ func (c CDataContent) kind() NodeKind { return CDataContentNode }
 func (c CDataContent) write(w *Writer) error {
 	s := string(c)
 	if w.Enforce {
-		if err := w.checkParent(NoNode, CDataNode); err != nil {
+		if err := w.checkParent(noNodeFlag | cDataNodeFlag); err != nil {
 			return err
 		}
 		// FIXME: we could escape this. should we?
@@ -176,12 +177,13 @@ type CData struct {
 }
 
 func (c CData) start(w *Writer) error {
-	if err := w.pushBegin(CDataNode, []NodeKind{NoNode, ElemNode}); err != nil {
+	if err := w.pushBegin(CDataNode, noNodeFlag|elemNodeFlag); err != nil {
 		return err
 	}
 	np := &w.nodes[w.current+1]
 	np.clear()
 	np.kind = CDataNode
+	np.flag = cDataNodeFlag
 	np.cdata = c
 	return w.pushEnd()
 }
@@ -269,12 +271,13 @@ func (d Doc) WithStandalone(v bool) Doc { d.Standalone = &v; return d }
 func (d Doc) kind() NodeKind { return DocNode }
 
 func (d Doc) start(w *Writer) error {
-	if err := w.pushBegin(DocNode, []NodeKind{NoNode}); err != nil {
+	if err := w.pushBegin(DocNode, noNodeFlag); err != nil {
 		return err
 	}
 	np := &w.nodes[w.current+1]
 	np.clear()
 	np.kind = DocNode
+	np.flag = docNodeFlag
 	np.doc = d
 	return w.pushEnd()
 }
@@ -356,7 +359,7 @@ func (p PI) kind() NodeKind { return PINode }
 
 func (p PI) write(w *Writer) error {
 	if w.Enforce {
-		if err := w.checkParent(NoNode, DocNode, ElemNode); err != nil {
+		if err := w.checkParent(noNodeFlag | docNodeFlag | elemNodeFlag); err != nil {
 			return err
 		}
 		if strings.ToLower(p.Target) == "xml" {

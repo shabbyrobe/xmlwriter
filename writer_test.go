@@ -4,100 +4,12 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"io"
 	"io/ioutil"
-	"runtime"
 	"strings"
 	"testing"
 
 	tt "github.com/shabbyrobe/xmlwriter/testtool"
 )
-
-var memstats runtime.MemStats
-
-func allocs() uint64 {
-	runtime.ReadMemStats(&memstats)
-	return memstats.Mallocs
-}
-
-type DodgyWriter struct {
-	writer     io.Writer
-	shouldFail func(b []byte) (fail bool, len int, err error)
-}
-
-func (d *DodgyWriter) Write(b []byte) (len int, err error) {
-	if fail, len, err := d.shouldFail(b); fail {
-		return len, err
-	}
-	return d.writer.Write(b)
-}
-
-func open(o ...Option) (*bytes.Buffer, *Writer) {
-	b := &bytes.Buffer{}
-	w := Open(b, o...)
-	return b, w
-}
-
-func openNull(o ...Option) *Writer {
-	return Open(ioutil.Discard, o...)
-}
-
-func str(b *bytes.Buffer, w *Writer) string {
-	must(w.Flush())
-	return b.String()
-}
-
-func doWrite(node ...Writable) string {
-	b, w := open()
-	for _, n := range node {
-		must(w.Write(n))
-	}
-	return str(b, w)
-}
-
-func doStart(node ...Startable) string {
-	b, w := open()
-	for _, n := range node {
-		must(w.Start(n))
-	}
-	return str(b, w)
-}
-
-func doBlock(start Startable, children ...Writable) string {
-	b, w := open()
-	must(w.Block(start, children...))
-	return str(b, w)
-}
-
-func doWriteErrMsg(nodes ...Writable) (ret string) {
-	defer func() {
-		if e := recover(); e != nil {
-			ret = e.(error).Error()
-		}
-	}()
-	doWrite(nodes...)
-	return ""
-}
-
-func doStartErrMsg(nodes ...Startable) (ret string) {
-	defer func() {
-		if e := recover(); e != nil {
-			ret = e.(error).Error()
-		}
-	}()
-	doStart(nodes...)
-	return ""
-}
-
-func doBlockErrMsg(start Startable, children ...Writable) (ret string) {
-	defer func() {
-		if e := recover(); e != nil {
-			ret = e.(error).Error()
-		}
-	}()
-	doBlock(start, children...)
-	return ""
-}
 
 func TestDoc(t *testing.T) {
 	b, w := open()
@@ -558,6 +470,62 @@ func testInvalidParent(t *testing.T, startNode bool, node Node, parent Startable
 	}
 	tt.Assert(t, err != nil)
 	tt.Assert(t, strings.HasPrefix(err.Error(), "xmlwriter: unexpected kind "), err.Error())
+}
+
+func TestInvalidEnder(t *testing.T) {
+	ender := func(k NodeKind) func(w *Writer) error {
+		switch k {
+		case CDataNode:
+			return func(w *Writer) error { return w.EndCData() }
+		case CommentNode:
+			return func(w *Writer) error { return w.EndComment() }
+		case DTDNode:
+			return func(w *Writer) error { return w.EndDTD() }
+		case DTDAttListNode:
+			return func(w *Writer) error { return w.EndDTDAttList() }
+		case DocNode:
+			return func(w *Writer) error { return w.EndDoc() }
+		case ElemNode:
+			return func(w *Writer) error { return w.EndElem() }
+		default:
+			panic("non-endable")
+		}
+	}
+
+	const OK = -1
+
+	for idx, tc := range []struct {
+		FailsAt int // Ender index that doesn't work
+		Starts  []Startable
+		Enders  []NodeKind
+	}{
+		{OK, []Startable{Elem{Name: "yep"}}, []NodeKind{ElemNode}},
+		{0, []Startable{Elem{Name: "yep"}}, []NodeKind{DTDNode}},
+		{0, []Startable{Elem{Name: "yep"}}, []NodeKind{CDataNode}},
+		{0, []Startable{CData{}}, []NodeKind{CommentNode}},
+		{0, []Startable{CData{}}, []NodeKind{DTDAttListNode}},
+		{0, []Startable{CData{}}, []NodeKind{DTDNode}},
+		{0, []Startable{CData{}}, []NodeKind{DocNode}},
+		{0, []Startable{CData{}}, []NodeKind{ElemNode}},
+		{1, []Startable{Elem{Name: "yep"}, Elem{Name: "yep"}}, []NodeKind{ElemNode, CDataNode}},
+	} {
+		t.Run(fmt.Sprintf("%d", idx), func(t *testing.T) {
+			w := openNull()
+			for _, s := range tc.Starts {
+				tt.OK(t, w.Start(s))
+			}
+			failedAt := OK
+			for idx, e := range tc.Enders {
+				err := ender(e)(w)
+				if err != nil {
+					failedAt = idx
+					break
+				}
+			}
+
+			tt.Assert(t, tc.FailsAt == failedAt)
+		})
+	}
 }
 
 // allows us to make sure that we can collect errors emitted by
