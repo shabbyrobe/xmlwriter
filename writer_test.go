@@ -422,12 +422,12 @@ func TestEndNamed(t *testing.T) {
 
 	_, w = open()
 	ec.Must(w.Start(DTD{Name: "foo"}))
-	tt.Pattern(t, `dtd name 'foo' did not match expected 'bar'`,
+	tt.Pattern(t, `dtd name "foo" did not match expected "bar"`,
 		w.End(DTDNode, "bar").Error())
 
 	_, w = open()
 	ec.Must(w.Start(DTDAttList{Name: "foo"}))
-	tt.Pattern(t, `dtdattlist name 'foo' did not match expected 'bar'`,
+	tt.Pattern(t, `dtdattlist name "foo" did not match expected "bar"`,
 		w.End(DTDAttListNode, "bar").Error())
 
 	// FIXME: This could be better as an error.
@@ -441,12 +441,12 @@ func TestEndNamed(t *testing.T) {
 
 	_, w = open()
 	ec.Must(w.Start(Elem{Prefix: "yep", Name: "foo"}))
-	tt.Pattern(t, `elem name 'yep:foo' did not match expected 'nup:foo'`,
+	tt.Pattern(t, `elem name "yep:foo" did not match expected "nup:foo"`,
 		w.End(ElemNode, "nup", "foo").Error())
 
 	_, w = open()
 	ec.Must(w.Start(Elem{Prefix: "yep", Name: "foo"}))
-	tt.Pattern(t, `elem name 'yep:foo' did not match expected 'yep:bar'`,
+	tt.Pattern(t, `elem name "yep:foo" did not match expected "yep:bar"`,
 		w.End(ElemNode, "yep", "bar").Error())
 
 	_, w = open()

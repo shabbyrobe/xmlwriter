@@ -5,7 +5,10 @@ type NodeKind int
 
 // Name returns a string representation of the NodeKind.
 func (n NodeKind) Name() string {
-	return kindName[n]
+	if int(n) < nodeKindLength {
+		return kindName[n]
+	}
+	return ""
 }
 
 // Range of allowed NodeKind values.
@@ -27,9 +30,11 @@ const (
 	PINode
 	RawNode
 	TextNode
+
+	nodeKindLength int = iota
 )
 
-var kindName = map[NodeKind]string{
+var kindName = [nodeKindLength]string{
 	NoNode:             "none",
 	AttrNode:           "attr",
 	CDataNode:          "cdata",

@@ -365,7 +365,7 @@ func (w *Writer) End(kind NodeKind, name ...string) error {
 		}
 		if nname != name[0] {
 			exp := name[0]
-			return fmt.Errorf("xmlwriter: %s name '%s' did not match expected '%s'", kindName[kind], nname, exp)
+			return fmt.Errorf("xmlwriter: %s name %q did not match expected %q", kind.Name(), nname, exp)
 		}
 	case 2:
 		switch kind {
@@ -373,7 +373,7 @@ func (w *Writer) End(kind NodeKind, name ...string) error {
 			if w.nodes[w.current].elem.Prefix != name[0] || w.nodes[w.current].elem.Name != name[1] {
 				exp := name[0] + ":" + name[1]
 				nname := w.nodes[w.current].elem.fullName()
-				return fmt.Errorf("xmlwriter: %s name '%s' did not match expected '%s'", kindName[kind], nname, exp)
+				return fmt.Errorf("xmlwriter: %s name %q did not match expected %q", kind.Name(), nname, exp)
 			}
 		default:
 			return fmt.Errorf("xmlwriter: tried to pop named, but node was not named")
@@ -467,14 +467,14 @@ func (w *Writer) pushEnd() error {
 	return nil
 }
 
-func (w *Writer) checkParent(kind ...NodeKind) error {
-	k := NoNode
+func (w *Writer) checkParent(kinds ...NodeKind) error {
+	currentKind := NoNode
 	if w.current >= 0 {
-		k = w.nodes[w.current].kind
+		currentKind = w.nodes[w.current].kind
 	}
 	valid := false
-	for _, check := range kind {
-		if check == k {
+	for _, check := range kinds {
+		if check == currentKind {
 			valid = true
 			break
 		}
@@ -482,11 +482,11 @@ func (w *Writer) checkParent(kind ...NodeKind) error {
 	if !valid {
 		// this used to be an error value, but it caused the ...NodeKind
 		// arg to escape to the heap.
-		names := make([]string, len(kind))
-		for i, k := range kind {
-			names[i] = kindName[k]
+		names := make([]string, len(kinds))
+		for i, nk := range kinds {
+			names[i] = nk.Name()
 		}
-		return fmt.Errorf("xmlwriter: unexpected kind %s, expected %s", kindName[k], strings.Join(names, ", "))
+		return fmt.Errorf("xmlwriter: unexpected kind %s, expected %s", currentKind.Name(), strings.Join(names, ", "))
 	}
 	return nil
 }
@@ -506,14 +506,14 @@ func (w *Writer) writeBeginCur(kind NodeKind) error {
 	return nil
 }
 
-func (w *Writer) pop(kind ...NodeKind) error {
+func (w *Writer) pop(kinds ...NodeKind) error {
 	if w.current < 0 {
 		return fmt.Errorf("xmlwriter: could not pop node")
 	}
 	valid := true
-	if len(kind) > 0 {
+	if len(kinds) > 0 {
 		currentKind := w.nodes[w.current].kind
-		for _, k := range kind {
+		for _, k := range kinds {
 			if currentKind != k {
 				valid = false
 				break
@@ -521,12 +521,12 @@ func (w *Writer) pop(kind ...NodeKind) error {
 		}
 		if !valid {
 			// this used to be an error value, but it caused the ...NodeKind
-			// arg to escape to the heap.
-			names := make([]string, len(kind))
-			for i, k := range kind {
-				names[i] = kindName[k]
+			// arg to escape to the heap for all branches, not just this one:
+			names := make([]string, len(kinds))
+			for i, nk := range kinds {
+				names[i] = nk.Name()
 			}
-			return fmt.Errorf("xmlwriter: unexpected kind %s, expected %s", kindName[currentKind], strings.Join(names, ", "))
+			return fmt.Errorf("xmlwriter: unexpected kind %s, expected %s", currentKind.Name(), strings.Join(names, ", "))
 		}
 	}
 	if err := w.nodes[w.current].end(w); err != nil {

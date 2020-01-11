@@ -79,7 +79,6 @@ func (p printer) EscapeAttrString(s string) error {
 	sz := len(s)
 	i := 0
 	for ; i < sz; i++ {
-		// Most of the strings k
 		if attrStringEscaped[s[i]] == 0 {
 			goto slow
 		}

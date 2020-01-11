@@ -12,5 +12,5 @@ type Event struct {
 }
 
 func (e Event) String() string {
-	return fmt.Sprintf("%d\t%s\t+%d", e.State, kindName[e.Node], e.Children)
+	return fmt.Sprintf("%d\t%s\t+%d", e.State, e.Node.Name(), e.Children)
 }
