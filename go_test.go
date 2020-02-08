@@ -23,6 +23,6 @@ func TestNoDeps(t *testing.T) {
 		t.Fatal(err)
 	}
 	if !bytes.Equal(fix, bts) {
-		t.Fatal("go.mod contains unexpected content")
+		t.Fatal("go.mod contains unexpected content:\n" + string(bts))
 	}
 }
