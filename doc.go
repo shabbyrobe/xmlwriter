@@ -25,7 +25,7 @@ Creating
 xmlwriter.Writer{} takes any io.Writer, along with a variable list of options.
 
 	b := &bytes.Buffer{}
-	w := xmlwriter.NewWriter(b)
+	w := xmlwriter.Open(b)
 
 xmlwriter options are based on Dave Cheney's functional options pattern
 (https://dave.cheney.net/2014/10/17/functional-options-for-friendly-apis):
