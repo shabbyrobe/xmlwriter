@@ -1,6 +1,7 @@
 package xmlwriter
 
 import (
+	"errors"
 	"fmt"
 	"testing"
 
@@ -60,4 +61,15 @@ func TestCollectorPanic(t *testing.T) {
 	}()
 	tt.Equals(t, ec, result)
 	tt.Pattern(t, `error at .*errs_test\.go.* #3 - yep`, ec.Error())
+}
+
+func TestCollectorUnwrap(t *testing.T) {
+	in := fmt.Errorf("yep")
+	ec := &ErrCollector{}
+	result := func() (err error) {
+		defer ec.Set(&err)
+		ec.Do(in)
+		return
+	}()
+	tt.Assert(t, errors.Is(result, in))
 }
