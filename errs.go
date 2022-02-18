@@ -63,6 +63,12 @@ func (e *ErrCollector) Error() string {
 	return fmt.Sprintf("error at %s:%d #%d - %v", e.File, e.Line, e.Index, e.Err)
 }
 
+// Unwrap satisfies the requirement of `errors.Unwrap()`, to allow testing
+// ErrCollector with e.g. `errors.Is()` and `errors.As()`.
+func (e *ErrCollector) Unwrap() error {
+	return e.Err
+}
+
 // Panic causes the collector to panic if any error has been collected.
 //
 // This should be called in a defer:
