@@ -8,7 +8,6 @@ xmlwriter
 > at some point in 2026.
 
 [![GoDoc](https://godoc.org/github.com/shabbyrobe/xmlwriter?status.svg)](https://godoc.org/github.com/shabbyrobe/xmlwriter)
-![Go](https://github.com/shabbyrobe/xmlwriter/workflows/Go/badge.svg)
 
 xmlwriter is a pure-Go library providing a procedural XML generation API based
 on libxml2's xmlwriter module. The package is extensively documented at
