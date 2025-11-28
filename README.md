@@ -1,6 +1,12 @@
 xmlwriter
 =========
 
+> [!WARNING]
+> This repo has [moved to sourcehut](https://git.sr.ht/~shabbyrobe/xmlwriter). The new import path is
+> go.shabbyrobe.org/xmlwriter. This library is feature complete, so only bugfixes will be accepted
+> in the new repo. The old import path of github.com/shabbyrobe/xmlwriter will be marked as deprecated
+> at some point in 2026.
+
 [![GoDoc](https://godoc.org/github.com/shabbyrobe/xmlwriter?status.svg)](https://godoc.org/github.com/shabbyrobe/xmlwriter)
 ![Go](https://github.com/shabbyrobe/xmlwriter/workflows/Go/badge.svg)
 
